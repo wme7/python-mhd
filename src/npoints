@@ -1,0 +1,2 @@
+      INTEGER          NG
+      PARAMETER        (NG = 1000)
