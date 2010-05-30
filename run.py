@@ -51,13 +51,16 @@ def sr_shocktube():
     import rmhd
 
     problem = SRShockTube2()
-    state   = rmhd.LibraryState()
+    state1  = rmhd.LibraryState(mode_reconstruct=1)
+    state2  = rmhd.LibraryState(mode_reconstruct=2)
 
-    P1 = run_1d_problem(rmhd._lib2, state, problem, CFL=0.5, tfinal=0.4)
-    P2 = rmhd.riemann.exact_sr_vt(problem, tfinal=0.4)
+    P0 = rmhd.riemann.exact_sr_vt(problem,           tfinal=0.2)
+    P1 = run_1d_problem(rmhd._lib2, state1, problem, tfinal=0.2, CFL=0.5)
+    P2 = run_1d_problem(rmhd._lib2, state2, problem, tfinal=0.2, CFL=0.5)
 
-    rmhd.visual.shocktube(P1, label="lib2", linestyle='--')
-    rmhd.visual.shocktube(P2, label="exact", linestyle='-', marker='None', lw=2)
+    rmhd.visual.shocktube(P0, label="exact", linestyle='-', marker='None', lw=2)
+    rmhd.visual.shocktube(P1, label="3vel", linestyle='--')
+    rmhd.visual.shocktube(P2, label="4vel", linestyle='-.')
     show()
 
 
@@ -68,10 +71,10 @@ def compare_libs_1_and_2():
     from pylab import show
     import rmhd
 
-    problem = RMHDShockTube1(L={'Pre':10.0})
+    problem = RMHDShockTube1(L={'Pre':1.0})
 
     state1  = rmhd.LibraryState()
-    state2  = rmhd.LibraryState(mode_reconstruct=1)
+    state2  = rmhd.LibraryState(mode_reconstruct=2)
 
     P1 = run_1d_problem(rmhd._lib1, state1, problem, CFL=0.5, tfinal=0.4)
     P2 = run_1d_problem(rmhd._lib2, state2, problem, CFL=0.5, tfinal=0.4)

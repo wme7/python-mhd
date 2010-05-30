@@ -35,7 +35,7 @@ struct LibraryState
 
 double *PrimitiveArray;
 double *FluxInterArray;
-
+double *lib_ux, *lib_uy, *lib_uz;
 
 int set_state(struct LibraryState state)
 {
@@ -63,6 +63,10 @@ int initialize(double *P, int Nx, int Ny, int Nz)
   FluxInterArray = (double*) malloc(stride[0]*sizeof(double));
   memcpy(PrimitiveArray, P, stride[0]*sizeof(double));
 
+  lib_ux = (double*) malloc(stride[0]/8*sizeof(double));
+  lib_uy = (double*) malloc(stride[0]/8*sizeof(double));
+  lib_uz = (double*) malloc(stride[0]/8*sizeof(double));
+
   printf("Initialized python ZMHD extension, version 2.\n");
   return 0;
 }
@@ -70,6 +74,11 @@ int finalize()
 {
   free(PrimitiveArray);
   free(FluxInterArray);
+
+  free(lib_ux);
+  free(lib_uy);
+  free(lib_uz);
+
   printf("Finalized python ZMHD extension, version 2.\n");
   return 0;
 }
@@ -96,8 +105,7 @@ inline double min3(double a, double b, double c)
 }
 
 int new_QuarticEquation(double d4, double d3, double d2, double d1, double d0);
-int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr);
-int reconstruct_use_4vel(const double *P0, double *Pl, double *Pr);
+int reconstruct       (const double *P0, double *Pl, double *Pr);
 int Fiph              (const double *P, double *F);
 int dUdt_1d           (const double *U, double *L);
 int prim_to_cons_point(const double *P, double *U);
@@ -194,12 +202,46 @@ int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr)
 
   return 0;
 }
-int reconstruct_use_4vel(const double *P0, double *Pl, double *Pr)
+
+int reconstruct_use_4vel(const double *P0,
+			 const double *ux, const double *uy, const double *uz,
+			 double *Pl, double *Pr)
 {
   const size_t S = stride[dimension];
   const size_t T = 2*S;
 
-  // not implemented in this revision
+  // Here, Pr refers to the left edge of cell i+1
+  //       Pl refers to the rght edge of cell i
+
+  Pr[rho] = P0[S+rho] - 0.5*plm_minmod(P0[ 0+rho], P0[S+rho], P0[T+rho]);
+  Pl[rho] = P0[0+rho] + 0.5*plm_minmod(P0[-S+rho], P0[0+rho], P0[S+rho]);
+
+  Pr[pre] = P0[S+pre] - 0.5*plm_minmod(P0[ 0+pre], P0[S+pre], P0[T+pre]);
+  Pl[pre] = P0[0+pre] + 0.5*plm_minmod(P0[-S+pre], P0[0+pre], P0[S+pre]);
+
+  Pr[Bx] = P0[S+Bx] - 0.5*plm_minmod(P0[ 0+Bx], P0[S+Bx], P0[T+Bx]);
+  Pl[Bx] = P0[0+Bx] + 0.5*plm_minmod(P0[-S+Bx], P0[0+Bx], P0[S+Bx]);
+
+  Pr[By] = P0[S+By] - 0.5*plm_minmod(P0[ 0+By], P0[S+By], P0[T+By]);
+  Pl[By] = P0[0+By] + 0.5*plm_minmod(P0[-S+By], P0[0+By], P0[S+By]);
+
+  Pr[Bz] = P0[S+Bz] - 0.5*plm_minmod(P0[ 0+Bz], P0[S+Bz], P0[T+Bz]);
+  Pl[Bz] = P0[0+Bz] + 0.5*plm_minmod(P0[-S+Bz], P0[0+Bz], P0[S+Bz]);
+
+  const double ux_r = ux[1] - 0.5*plm_minmod(ux[ 0], ux[1], ux[2]);
+  const double ux_l = ux[0] + 0.5*plm_minmod(ux[-1], ux[0], ux[1]);
+
+  const double uy_r = uy[1] - 0.5*plm_minmod(uy[ 0], uy[1], uy[2]);
+  const double uy_l = uy[0] + 0.5*plm_minmod(uy[-1], uy[0], uy[1]);
+
+  const double uz_r = uz[1] - 0.5*plm_minmod(uz[ 0], uz[1], uz[2]);
+  const double uz_l = uz[0] + 0.5*plm_minmod(uz[-1], uz[0], uz[1]);
+
+  const double Wr = sqrt(1 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
+  const double Wl = sqrt(1 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
+
+  Pr[vx] = ux_r/Wr;  Pr[vy] = uy_r/Wr;  Pr[vz] = uz_r/Wr;
+  Pl[vx] = ux_l/Wl;  Pl[vy] = uy_l/Wl;  Pl[vz] = uz_l/Wl;
 
   return 0;
 }
@@ -208,14 +250,15 @@ int dUdt_1d(const double *U, double *L)
 {
   double *P = PrimitiveArray;
   double *F = FluxInterArray;
+  int failures,S,i;
 
-  int failures = cons_to_prim_array(U,P);
+  failures = cons_to_prim_array(U,P);
+  if (failures) return failures;
 
   dimension = 1;
   Fiph(P,F);
 
-  size_t S = stride[dimension];
-  int i;
+  S = stride[dimension];
   for (i=S; i<stride[0]; ++i)
     {
       L[i] = -(F[i] - F[i-S]) / dx;
@@ -282,11 +325,11 @@ int Fiph(const double *P, double *F)
           break;
 
         case Reconstruct_PLM4Velocity:
-          reconstruct_use_4vel(P0, Pl, Pr);
+          reconstruct_use_4vel(P0, &lib_ux[i/8], &lib_uy[i/8], &lib_uz[i/8], Pl, Pr);
           break;
 
-	default:
-	  reconstruct_use_3vel(P0, Pl, Pr);
+        default:
+          reconstruct_use_3vel(P0, Pl, Pr);
           break;
         }
 
@@ -437,8 +480,9 @@ int cons_to_prim_point(const double *U, double *P)
   int n_iter         = 0;
 
   // Quantites guessed from existing primitives, or estimated from conserved
+  double v2 = P[vx]*P[vx] + P[vy]*P[vy] + P[vz]*P[vz];
   double h_guess = 1 + eos_sie(P[rho], P[pre]) + P[pre]/P[rho];
-  double W_guess = 1.0 / sqrt(1 - (P[vx]*P[vx] + P[vy]*P[vy] + P[vz]*P[vz]));
+  double W_guess = 1.0 / sqrt(1 - v2);
   double W = (est) ? sqrt(S2/(D*D) + 1) : W_guess;
   double Z = (est) ? D*W                : P[rho]*h_guess*W_guess*W_guess;
 
@@ -536,23 +580,22 @@ int cons_to_prim_array(const double *U, double *P)
   int failures = 0;
   int i;
 
-  if (P != PrimitiveArray) // Replace the input array if not the same
+  if (P != PrimitiveArray) // Replace the input array if not library's own copy
     memcpy(P, PrimitiveArray, stride[0]*sizeof(double));
 
   for (i=0; i<stride[0]; i+=8)
     {
       const double *Ui = &U[i];
       double       *Pi = &P[i];
+      failures += cons_to_prim_point(Ui,Pi);
 
-      if (Ui[ddd] < 0.0 || Ui[tau] < 0.0 ||
-          Pi[pre] < 0.0 || Pi[rho] < 0.0)
-        {
-	  failures += 1;
-        }
-      else if (cons_to_prim_point(Ui, Pi))
-        {
-	  failures += 1;
-        }
+      if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity)
+	{
+	  double W = 1.0 / sqrt(1.0 - (Pi[vx]*Pi[vx] + Pi[vy]*Pi[vy] + Pi[vz]*Pi[vz]));
+	  lib_ux[i/8] = W*Pi[vx];
+	  lib_uy[i/8] = W*Pi[vy];
+	  lib_uz[i/8] = W*Pi[vz];
+	}
     }
   return failures;
 }
