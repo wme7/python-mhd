@@ -49,7 +49,7 @@ class TestProblemDriver:
             e2 = lib.dUdt_1d(U + 0.5*dt*L,L)
 
             if e1 or e2:
-                print "Run crashed! Sorry...", e1, e2
+                print "Run crashed! Sorry..."
                 break
 
             U += dt*L
@@ -90,10 +90,10 @@ def compare_libs_1_and_2():
     from pylab import show
     import rmhd
 
-    problem = RMHDShockTube1(L={'Pre':100.0}, Nx=256, CFL=0.8)
-    driver  = TestProblemDriver(problem)
+    problem = RMHDShockTube1(L={'Pre':10.0})
+    driver  = TestProblemDriver(problem, Nx=256, CFL=0.8)
     state1  = rmhd.LibraryState()
-    state2  = rmhd.LibraryState(mode_reconstruct=0)
+    state2  = rmhd.LibraryState(mode_reconstruct=1)
 
     P1 = driver.run(rmhd._lib1, state1)
     P2 = driver.run(rmhd._lib2, state2)
@@ -106,4 +106,5 @@ def compare_libs_1_and_2():
 if __name__ == "__main__":
 
     from rmhd.testbench import *
-    sr_shocktube()
+    #sr_shocktube()
+    compare_libs_1_and_2()
