@@ -108,3 +108,4 @@ if __name__ == "__main__":
     from rmhd.testbench import *
     #sr_shocktube()
     compare_libs_1_and_2()
+

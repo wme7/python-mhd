@@ -1,8 +1,8 @@
 
-#include <math.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <memory.h>
+#include <stdio.h>
+#include <math.h>
 
 enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz };
 enum { rho, pre, vx, vy, vz };
@@ -17,7 +17,7 @@ enum QuarticSolverMode { QuarticSolver_Exact,
 
 int dimension;
 int stride[4];
-double dx;
+double dx,dy,dz;
 
 struct LibraryState
 {
@@ -49,17 +49,17 @@ struct LibraryState get_state()
 
 int initialize(double *P, int Nx)
 {
-  stride[0] = Nx;
-  stride[1] = 1;
+  stride[0] = Nx*8;
+  stride[1] = 1*8;
   stride[2] = 0;
   stride[3] = 0;
   dimension = 1;
 
   dx = 1.0 / Nx;
 
-  PrimitiveArray = (double*) malloc(stride[0]*8*sizeof(double));
-  FluxInterArray = (double*) malloc(stride[0]*8*sizeof(double));
-  memcpy(PrimitiveArray, P, stride[0]*8*sizeof(double));
+  PrimitiveArray = (double*) malloc(stride[0]*sizeof(double));
+  FluxInterArray = (double*) malloc(stride[0]*sizeof(double));
+  memcpy(PrimitiveArray, P, stride[0]*sizeof(double));
 
   printf("Initialized python ZMHD extension, version 2.\n");
   return 0;
@@ -160,7 +160,7 @@ int hll_flux(double *Ul, double *Ur, double *Fl, double *Fr,
 
 int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr)
 {
-  const size_t S = stride[dimension]*8;
+  const size_t S = stride[dimension];
   const size_t T = 2*S;
 
   Pr[rho] = P0[S+rho] - 0.5*plm_minmod(P0[ 0+rho], P0[S+rho], P0[T+rho]);
@@ -191,7 +191,7 @@ int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr)
 }
 int reconstruct_use_4vel(const double *P0, double *Pl, double *Pr)
 {
-  const size_t S = stride[dimension]*8;
+  const size_t S = stride[dimension];
   const size_t T = 2*S;
 
   const double v0[4] = { 1, P0[-S+vx], P0[-S+vy], P0[-S+vz] };
@@ -248,9 +248,9 @@ int dUdt_1d(const double *U, double *L)
   dimension = 1;
   Fiph(U,F);
 
-  size_t S = stride[dimension]*8;
+  size_t S = stride[dimension];
   int i;
-  for (i=S; i<stride[0]*8; ++i)
+  for (i=S; i<stride[0]; ++i)
     {
       L[i] = -(F[i] - F[i-S]) / dx;
     }
@@ -261,11 +261,11 @@ int Fiph(const double *U, double *F)
   const int S = stride[dimension];
 
   int i;
-  for (i=0; i<S*8; ++i)
+  for (i=0; i<S; ++i)
     {
       F[i] = 0;
     }
-  for (i=S*8; i<stride[0]*8-S*16; i+=8)
+  for (i=S; i<stride[0]-S*2; i+=8)
     {
       double Fl[8], Fr[8];
       double Ul[8], Ur[8];
@@ -302,7 +302,7 @@ int Fiph(const double *U, double *F)
 
       hll_flux(Ul, Ur, Fl, Fr, eml, epl, emr, epr, &F[i]);
     }
-  for (i=stride[0]*8-S*16; i<stride[0]*8; ++i)
+  for (i=stride[0]-S*2; i<stride[0]; ++i)
     {
       F[i] = 0;
     }
@@ -541,9 +541,9 @@ int cons_to_prim_array(const double *U, double *P)
   int i;
 
   if (P != PrimitiveArray) // Replace the input array if not the same
-    memcpy(P, PrimitiveArray, 8*stride[0]*sizeof(double));
+    memcpy(P, PrimitiveArray, stride[0]*sizeof(double));
 
-  for (i=0; i<stride[0]*8; i+=8)
+  for (i=0; i<stride[0]; i+=8)
     {
       const double *Ui = &U[i];
       double       *Pi = &P[i];
@@ -591,7 +591,7 @@ int prim_to_cons_point(const double *P, double *U)
 int prim_to_cons_array(const double *P, double *U)
 {
   int i;
-  for (i=0; i<stride[0]*8; i+=8)
+  for (i=0; i<stride[0]; i+=8)
     {
       prim_to_cons_point(&P[i], &U[i]);
     }

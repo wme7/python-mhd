@@ -12,3 +12,4 @@ if __name__ == "__main__":
     sr_riemann = Extension('sr_riemann', ['src/sr_riemann.f', 'src/sr_riemann-vt.f'])
 
     setup(name='rmhd', ext_modules=[librmhd1, librmhd2, sr_riemann])
+
