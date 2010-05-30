@@ -107,16 +107,19 @@ def compare_quartic():
     state0  = rmhd.LibraryState(mode_quartic_solver=0)
     state1  = rmhd.LibraryState(mode_quartic_solver=1)
     state2  = rmhd.LibraryState(mode_quartic_solver=2)
+    state3  = rmhd.LibraryState(mode_quartic_solver=3)
 
-    run_args = {'Nx':1024, 'CFL':0.5, 'tfinal':0.2}
+    run_args = {'Nx':512, 'CFL':0.5, 'tfinal':0.2}
 
     P0 = run_1d_problem(rmhd._lib, state0, problem, **run_args)
     P1 = run_1d_problem(rmhd._lib, state1, problem, **run_args)
     P2 = run_1d_problem(rmhd._lib, state2, problem, **run_args)
+    P3 = run_1d_problem(rmhd._lib, state3, problem, **run_args)
 
     rmhd.visual.shocktube(P0, label="Exact", linestyle='--', mfc='None')
     rmhd.visual.shocktube(P1, label="Approx1", linestyle='-.', mfc='None')
-    rmhd.visual.shocktube(P2, label="Approx2", linestyle='-', marker='None')
+    rmhd.visual.shocktube(P2, label="Approx2", linestyle=':', marker='None')
+    rmhd.visual.shocktube(P3, label="None", linestyle='-', marker='None')
     show()
 
 

@@ -34,7 +34,8 @@ enum ReconstructMode { Reconstruct_PiecewiseConstant,
 
 enum QuarticSolverMode { QuarticSolver_Exact,
 			 QuarticSolver_Approx1,
-			 QuarticSolver_Approx2 };
+			 QuarticSolver_Approx2,
+			 QuarticSolver_None };
 
 int dimension;
 int stride[4];
@@ -105,7 +106,38 @@ int finalize()
 }
 
 
+/*------------------------------------------------------------------------------
+ *
+ * Function prototypes
+ *
+ */
+int Fiph              (const double *P, double *F);
+int prim_to_cons_point(const double *P, double *U);
+int cons_to_prim_point(const double *U, double *P);
+int prim_to_cons_array(const double *P, double *U);
+int cons_to_prim_array(const double *U, double *P);
+int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am);
 
+int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr);
+int reconstruct_use_4vel(const double *P0,
+			 const double *ux, const double *uy, const double *uz,
+			 double *Pl, double *Pr);
+
+int new_QuarticEquation(double d4, double d3, double d2, double d1, double d0);
+int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
+                           int *nr12, int *nr34);
+int solve_quartic_approx1(double *x);
+int solve_quartic_approx2(double *x);
+
+int report_cons_to_prim_failure(const double *U, const double *P);
+int report_nonphysical_failure (const double *U, const double *P);
+
+
+/*------------------------------------------------------------------------------
+ *
+ * Inline functions, rather than macros for common arithmetic operations
+ *
+ */
 inline double sign(double x)
 {
   return (x>0)-(x<0);
@@ -124,41 +156,6 @@ inline double min3(double a, double b, double c)
   double ab=(a<b)?a:b;
   return (ab<c)?ab:c;
 }
-
-int new_QuarticEquation(double d4, double d3, double d2, double d1, double d0);
-int reconstruct       (const double *P0, double *Pl, double *Pr);
-int Fiph              (const double *P, double *F);
-int dUdt_1d           (const double *U, double *L);
-int prim_to_cons_point(const double *P, double *U);
-int cons_to_prim_point(const double *U, double *P);
-int prim_to_cons_array(const double *P, double *U);
-int cons_to_prim_array(const double *U, double *P);
-int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am);
-
-int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
-                           int *nr12, int *nr34);
-
-int solve_quartic_approx1(double *x);
-int solve_quartic_approx2(double *x);
-
-int report_cons_to_prim_failure(const double *U, const double *P);
-int report_nonphysical_failure (const double *U, const double *P);
-
-double eos_pre(double Rho, double Sie)
-{
-  return Sie * (Rho * (lib_state.adiabatic_gamma - 1.0));
-}
-double eos_sie(double Rho, double Pre)
-{
-  return Pre / (Rho * (lib_state.adiabatic_gamma - 1.0));
-}
-double eos_cs2(double Rho, double Pre)
-{
-  double e = eos_sie(Rho, Pre);
-  return lib_state.adiabatic_gamma * Pre / (Pre + Rho + Rho*e);
-}
-
-
 inline void invert_2by2_matrix(const double A[2][2], double B[2][2])
 {
   double det = A[0][0]*A[1][1] - A[1][0]*A[0][1];
@@ -176,6 +173,25 @@ inline double plm_minmod(double ul, double u0, double ur)
 
   return 0.25*fabs(sign(a) + sign(b)) * (sign(a) + sign(c))*min3(fabs(a), fabs(b), fabs(c));
 }
+/*------------------------------------------------------------------------------
+ *
+ * Functions describing adiabatic equation of state
+ *
+ */
+inline double eos_pre(double Rho, double Sie)
+{
+  return Sie * (Rho * (lib_state.adiabatic_gamma - 1.0));
+}
+inline double eos_sie(double Rho, double Pre)
+{
+  return Pre / (Rho * (lib_state.adiabatic_gamma - 1.0));
+}
+inline double eos_cs2(double Rho, double Pre)
+{
+  double e = eos_sie(Rho, Pre);
+  return lib_state.adiabatic_gamma * Pre / (Pre + Rho + Rho*e);
+}
+
 
 
 int hll_flux(double *Ul, double *Ur, double *Fl, double *Fr,
@@ -454,40 +470,53 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
   const double A1 = -4*K*V3 - L*vi*2   - 2*b0*bi;
   const double A0 =    K*V4 + L*V2     +   bi*bi;
 
-  double r1, r2, r3, r4;
-  int nr12, nr34, nr;
+
 
   new_QuarticEquation(A4,A3,A2,A1,A0);
   switch (lib_state.mode_quartic_solver)
     {
-    case (QuarticSolver_Exact):
-      nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
+
+    case QuarticSolver_Exact:
+      {
+	double r1, r2, r3, r4;
+	int nr12, nr34;
+	int nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
+	
+	double ap12 = (r1>r2) ? r1 : r2;
+	double ap34 = (r3>r4) ? r3 : r4;
+
+	double am12 = (r1<r2) ? r1 : r2;
+	double am34 = (r3<r4) ? r3 : r4;
+
+	*ap = (nr==2) ? ((nr12==2) ? ap12 : ap34) : ((ap12>ap34) ? ap12 : ap34);
+	*am = (nr==2) ? ((nr12==2) ? am12 : am34) : ((am12<am34) ? am12 : am34);
+      }
       break;
-    case (QuarticSolver_Approx1):
-      nr = 2; nr12 = 2; nr34 = 0;
-      r1 = -1.0; r2 = 1.0;
-      solve_quartic_approx1(&r1);
-      solve_quartic_approx1(&r2);
+
+    case QuarticSolver_Approx1:
+      {
+	*am = -1.0; *ap = 1.0;
+	solve_quartic_approx1(am);
+	solve_quartic_approx1(ap);
+      }
       break;
-    case (QuarticSolver_Approx2):
-      nr = 2; nr12 = 2; nr34 = 0;
-      r1 = -1.0; r2 = 1.0;
-      solve_quartic_approx2(&r1);
-      solve_quartic_approx2(&r2);
+
+    case QuarticSolver_Approx2:
+      {
+	*am = -1.0; *ap = 1.0;
+	solve_quartic_approx2(am);
+	solve_quartic_approx2(ap);
+      }
       break;
-    default:
-      nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
+
+    case QuarticSolver_None:
+      {
+	*ap =  1.0;
+	*am = -1.0;
+      }
       break;
     }
 
-  double ap12 = (r1>r2) ? r1 : r2;
-  double ap34 = (r3>r4) ? r3 : r4;
-
-  double am12 = (r1<r2) ? r1 : r2;
-  double am34 = (r3<r4) ? r3 : r4;
-
-  *ap = (nr==2) ? ((nr12==2) ? ap12 : ap34) : ((ap12>ap34) ? ap12 : ap34);
-  *am = (nr==2) ? ((nr12==2) ? am12 : am34) : ((am12<am34) ? am12 : am34);
   return 0;
 }
 
