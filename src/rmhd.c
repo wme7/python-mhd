@@ -1,11 +1,32 @@
 
+/*------------------------------------------------------------------------------
+ * FILE: rmhd.c
+ *
+ * AUTHOR: Jonathan Zrake, NYU CCPP: zrake@nyu.edu
+ *
+ * PURPOSE: Provide a derivative operator, dUdt, for the conserved quantites
+ *   of the Relativistic MHD equations. Internal memory is allocated for the
+ *   set of primitive quantites, as well 4-velocites.
+ * 
+ * REFERENCES:
+ *   
+ *------------------------------------------------------------------------------
+ */
+
 #include <stdlib.h>
 #include <memory.h>
 #include <stdio.h>
 #include <math.h>
 
-enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz };
-enum { rho, pre, vx, vy, vz };
+// Enums used for indexing through primitive/conserved
+// data. The state of a given cell is described by 8
+// contiguous doubles.
+
+enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz }; // Conserved
+enum { rho, pre, vx, vy, vz };             // Primitive
+
+
+// Modes for selecting the strategy of the solver
 
 enum ReconstructMode { Reconstruct_PiecewiseConstant,
 		       Reconstruct_PLM3Velocity,
@@ -67,7 +88,7 @@ int initialize(double *P, int Nx, int Ny, int Nz)
   lib_uy = (double*) malloc(stride[0]/8*sizeof(double));
   lib_uz = (double*) malloc(stride[0]/8*sizeof(double));
 
-  printf("Initialized python ZMHD extension, version 2.\n");
+  //  printf("Initialized RMHD library.\n");
   return 0;
 }
 int finalize()
@@ -79,7 +100,7 @@ int finalize()
   free(lib_uy);
   free(lib_uz);
 
-  printf("Finalized python ZMHD extension, version 2.\n");
+  //  printf("Finalized RMHD library.\n");
   return 0;
 }
 
@@ -116,6 +137,9 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 
 int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
                            int *nr12, int *nr34);
+
+int solve_quartic_approx1(double *x);
+int solve_quartic_approx2(double *x);
 
 int report_cons_to_prim_failure(const double *U, const double *P);
 int report_nonphysical_failure (const double *U, const double *P);
@@ -437,13 +461,22 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
   switch (lib_state.mode_quartic_solver)
     {
     case (QuarticSolver_Exact):
-      nr = solve_quartic_equation (&r1, &r2, &r3, &r4, &nr12, &nr34);
+      nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
       break;
     case (QuarticSolver_Approx1):
-      nr = solve_quartic_approx1  (&r1, &r2, &r3, &r4, &nr12, &nr34);
+      nr = 2; nr12 = 2; nr34 = 0;
+      r1 = -1.0; r2 = 1.0;
+      solve_quartic_approx1(&r1);
+      solve_quartic_approx1(&r2);
       break;
     case (QuarticSolver_Approx2):
-      nr = solve_quartic_approx2  (&r1, &r2, &r3, &r4, &nr12, &nr34);
+      nr = 2; nr12 = 2; nr34 = 0;
+      r1 = -1.0; r2 = 1.0;
+      solve_quartic_approx2(&r1);
+      solve_quartic_approx2(&r2);
+      break;
+    default:
+      nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
       break;
     }
 

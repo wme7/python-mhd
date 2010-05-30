@@ -143,71 +143,43 @@ int solve_cubic_equation(double  c3, double  c2,  double c1, double c0,
     }
 }
 
-int solve_quartic_approx1(double *xp, double *xm, int *count)
+int solve_quartic_approx1(double *x)
 {
   static const double ERROR_TOLR = 1e-14;
   static const int NEWTON_MAX_ITER = 10;
 
   double f,g;
-  int n_iter;
-  if (count) *count = 0;
+  int n_iter=0;
 
-  n_iter = 0;
-  f = evaluate_f(*xp);
+  f = evaluate_f(*x);
   while (fabs(f) > ERROR_TOLR)
     {
-      f = evaluate_f(*xp);
-      g = evaluate_dfdx(*xp);
-      *xp -= f/g;
+      f = evaluate_f(*x);
+      g = evaluate_dfdx(*x);
+      *x -= f/g;
       if (++n_iter > NEWTON_MAX_ITER) return 1;
     }
-  if (count) *count += n_iter;
-
-  n_iter = 0;
-  f = evaluate_f(*xm);
-  while (fabs(f) > ERROR_TOLR)
-    {
-      f = evaluate_f(*xm);
-      g = evaluate_dfdx(*xm);
-      *xm -= f/g;
-      if (++n_iter > NEWTON_MAX_ITER) return 1;
-    }
-  if (count) *count += n_iter;
 
   return 0;
 }
-int solve_quartic_approx2(double *xp, double *xm, int *count)
+int solve_quartic_approx2(double *x)
 {
   static const double ERROR_TOLR = 1e-14;
   static const int NEWTON_MAX_ITER = 10;
 
   double f,g,h;
-  int n_iter;
-  if (count) *count = 0;
+  int n_iter=0;
 
   n_iter = 0;
-  f = evaluate_f(*xp);
+  f = evaluate_f(*x);
   while (fabs(f) > ERROR_TOLR)
     {
-      f = evaluate_f(*xp);
-      g = evaluate_dfdx(*xp);
-      h = evaluate_df2dx2(*xp);
-      *xp -= (f*g) / (g*g - f*h);
+      f = evaluate_f(*x);
+      g = evaluate_dfdx(*x);
+      h = evaluate_df2dx2(*x);
+      *x -= (f*g) / (g*g - f*h);
       if (++n_iter > NEWTON_MAX_ITER) return 1;
     }
-  if (count) *count += n_iter;
-
-  n_iter = 0;
-  f = evaluate_f(*xm);
-  while (fabs(f) > ERROR_TOLR)
-    {
-      f = evaluate_f(*xm);
-      g = evaluate_dfdx(*xm);
-      h = evaluate_df2dx2(*xm);
-      *xm -= (f*g) / (g*g - f*h);
-      if (++n_iter > NEWTON_MAX_ITER) return 1;
-    }
-  if (count) *count += n_iter;
 
   return 0;
 }

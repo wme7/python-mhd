@@ -48,8 +48,8 @@ class LibraryState(Structure):
         self.adiabatic_gamma           = 1.4
         self.plm_theta                 = 2.0
 
-        self.mode_quartic_solver       = 0
-        self.mode_reconstruct          = 1
+        self.mode_quartic_solver       = 0 # Exact solver
+        self.mode_reconstruct          = 2 # PLM on 4-velocity
 
 
         for k in kwargs:
@@ -82,4 +82,3 @@ _lib.cons_to_prim_array.restype = c_int
 
 _lib.set_state.argtypes = [ LibraryState ]
 _lib.get_state.restype  =   LibraryState
-
