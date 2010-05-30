@@ -27,9 +27,7 @@ def exact_sr(problem, tfinal=0.4):
                        problem.R_state['Rho'],
                        problem.R_state['v'][0])
 
-    soln_stream = open('solution.dat')
-    soln_lines = soln_stream.readlines()
-    soln_stream.close()
+    soln_lines = open('solution.dat').readlines()
     system('rm -f solution.dat')
 
     x,pre,rho,vel,u = [[float(m.split()[i]) for m in soln_lines] for i in range(5)]
@@ -71,9 +69,7 @@ def exact_sr_vt(problem, tfinal=0.4):
                           problem.R_state['v'][0],
                           problem.R_state['v'][1])
 
-    soln_stream = open('solution.dat')
-    soln_lines = soln_stream.readlines()
-    soln_stream.close()
+    soln_lines = open('solution.dat').readlines()
     system('rm -f solution.dat')
 
     x,pre,rho,velx,vely = [[float(m.split()[i]) for m in soln_lines] for i in range(5)]

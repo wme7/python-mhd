@@ -11,8 +11,8 @@ from os import popen
 _lib_home = dirname(abspath(popen('find . -name *.so').readline()))
 path.append(abspath(_lib_home))
 _type_dict = {'int': c_int, 'double': c_double}
-_lib1 = CDLL(_lib_home+'/librmhd-1.so')
-_lib2 = CDLL(_lib_home+'/librmhd-2.so')
+_lib = CDLL(_lib_home+'/librmhd.so')
+
 
 
 import testbench
@@ -62,29 +62,24 @@ class LibraryState(Structure):
 const_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS'))
 write_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS', 'WRITEABLE'))
 
-_lib2.dUdt_2d.argtypes = [const_array, write_array]
-_lib2.dUdt_2d.restype = c_int
+_lib.initialize        .argtypes = [const_array, c_int, c_int, c_int]
+_lib.finalize          .argtypes = [ ]
+_lib.dUdt_1d           .argtypes = [const_array, write_array]
+_lib.dUdt_2d           .argtypes = [const_array, write_array]
+_lib.dUdt_3d           .argtypes = [const_array, write_array]
+_lib.Fiph              .argtypes = [const_array, write_array]
+_lib.prim_to_cons_array.argtypes = [const_array, write_array]
+_lib.cons_to_prim_array.argtypes = [const_array, write_array]
 
-for lib in [_lib1, _lib2]:
+_lib.initialize        .restype = c_int
+_lib.finalize          .restype = c_int
+_lib.dUdt_1d           .restype = c_int
+_lib.dUdt_2d           .restype = c_int
+_lib.dUdt_3d           .restype = c_int
+_lib.Fiph              .restype = c_int
+_lib.prim_to_cons_array.restype = c_int
+_lib.cons_to_prim_array.restype = c_int
 
-    lib.initialize        .argtypes = [const_array, c_int, c_int, c_int]
-    lib.finalize          .argtypes = [ ]
-    lib.dUdt_1d           .argtypes = [const_array, write_array]
-    lib.dUdt_2d           .argtypes = [const_array, write_array]
-    lib.dUdt_3d           .argtypes = [const_array, write_array]
-    lib.Fiph              .argtypes = [const_array, write_array]
-    lib.prim_to_cons_array.argtypes = [const_array, write_array]
-    lib.cons_to_prim_array.argtypes = [const_array, write_array]
-
-    lib.initialize        .restype = c_int
-    lib.finalize          .restype = c_int
-    lib.dUdt_1d           .restype = c_int
-    lib.dUdt_2d           .restype = c_int
-    lib.dUdt_3d           .restype = c_int
-    lib.Fiph              .restype = c_int
-    lib.prim_to_cons_array.restype = c_int
-    lib.cons_to_prim_array.restype = c_int
-
-    lib.set_state.argtypes = [ LibraryState ]
-    lib.get_state.restype  =   LibraryState
+_lib.set_state.argtypes = [ LibraryState ]
+_lib.get_state.restype  =   LibraryState
 

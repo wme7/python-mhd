@@ -2,7 +2,6 @@
 
 
 
-
 def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=False):
 
     from numpy import zeros
@@ -66,21 +65,24 @@ def sr_shocktube():
 
 
 
-def compare_libs_1_and_2():
+def compare_reconstruct():
 
     from pylab import show
     import rmhd
 
-    problem = RMHDShockTube1(L={'Pre':1.0})
+    problem = RMHDShockTube4()
 
-    state1  = rmhd.LibraryState()
+    state0  = rmhd.LibraryState(mode_reconstruct=0)
+    state1  = rmhd.LibraryState(mode_reconstruct=1)
     state2  = rmhd.LibraryState(mode_reconstruct=2)
 
-    P1 = run_1d_problem(rmhd._lib1, state1, problem, CFL=0.5, tfinal=0.4)
-    P2 = run_1d_problem(rmhd._lib2, state2, problem, CFL=0.5, tfinal=0.4)
+    P0 = run_1d_problem(rmhd._lib, state0, problem, CFL=0.5, tfinal=0.2)
+    P1 = run_1d_problem(rmhd._lib, state1, problem, CFL=0.5, tfinal=0.2)
+    P2 = run_1d_problem(rmhd._lib, state2, problem, CFL=0.5, tfinal=0.2)
 
-    rmhd.visual.shocktube(P1, label="run1", linestyle='--')
-    rmhd.visual.shocktube(P2, label="run2", linestyle='-', mfc='None')
+    rmhd.visual.shocktube(P0, label="Piecewise Constant", linestyle='--', mfc='None')
+    rmhd.visual.shocktube(P1, label="PLM 3-velocity", linestyle='-.', mfc='None')
+    rmhd.visual.shocktube(P2, label="PLM 4-velocity", linestyle='-', marker='None')
     show()
 
 
@@ -88,5 +90,4 @@ if __name__ == "__main__":
 
     from rmhd.testbench import *
     #sr_shocktube()
-    compare_libs_1_and_2()
-
+    compare_reconstruct()
