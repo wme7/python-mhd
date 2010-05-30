@@ -1,21 +1,12 @@
 
 def shocktube(P, **kwargs):
 
-    from pylab import sqrt, linspace, subplot, plot, text, xlabel, show
+    from pylab import sqrt, linspace, subplot, plot, text, xlabel, figure, show
     from pylab import subplots_adjust, setp, gca, LinearLocator, rcParams, legend
 
-    rho = P[:,0]
-    pre = P[:,1]
-
-    vx = P[:,2]
-    vy = P[:,3]
-    vz = P[:,4]
-
-    Bx = P[:,5]
-    By = P[:,6]
-    Bz = P[:,7]
-
-    rcParams.update({'axes.labelsize':16, 'ytick.major.pad':8})
+    rho, pre   = P[:,0], P[:,1]
+    vx, vy, vz = P[:,2], P[:,3], P[:,4]
+    Bx, By, Bz = P[:,5], P[:,6], P[:,7]
 
     plot_args = { }
     plot_args['marker'] = kwargs.get('marker', 'o')
@@ -23,6 +14,7 @@ def shocktube(P, **kwargs):
     plot_args['mfc'   ] = kwargs.get('mfc'   , 'None')
 
     plot_args.update(kwargs)
+    rcParams.update({'axes.labelsize':16, 'ytick.major.pad':8})
 
     x = linspace(-1,1,P.shape[0])
     g = 1 / sqrt(1-(vx**2+vy**2+vz**2))

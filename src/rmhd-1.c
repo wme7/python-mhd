@@ -533,7 +533,16 @@ int dUdt_1d(const double *U, double *L)
     }
   return 0;
 }
-
+int dUdt_2d(const double *U, double *L)
+{
+  // not implemented
+  return 1;
+}
+int dUdt_3d(const double *U, double *L)
+{
+  // not implemented
+  return 1;
+}
 int report_nonphysical_failure(const double *U, const AuxQnt *A)
 {
   printf("\n\n ## FATAL ERROR! ZMHD encountered nonphysical quantities!\n\n");

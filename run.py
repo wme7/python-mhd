@@ -3,67 +3,44 @@
 
 
 
-class TestProblemDriver:
+def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=False):
 
-    def __init__(self, problem, Nx=128, CFL=0.8):
+    from numpy import zeros
 
-        from numpy import array
+    P = zeros((Nx,8))
+    U = zeros((Nx,8))
+    L = zeros((Nx,8))
 
-        to_array = lambda S: array([S['Rho'], S['Pre'],
-                                    S['v'][0], S['v'][1], S['v'][2],
-                                    S['B'][0], S['B'][1], S['B'][2]])
+    state.adiabatic_gamma = problem.adiabatic_gamma
+    problem.initial_model(P)
+    lib.set_state(state)
+    lib.initialize(P,Nx,1,1)
+    lib.prim_to_cons_array(P,U)
 
-        self.Nx = Nx
-        self.CFL = CFL
-        self.L_state = to_array(problem.L_state)
-        self.R_state = to_array(problem.R_state)
-        self.problem = problem
+    dx  = 1.0 / Nx
+    t   = 0.0
+    dt  = CFL * dx
 
+    while t < tfinal:
+        e1 = lib.dUdt_1d(U,L)
+        e2 = lib.dUdt_1d(U + 0.5*dt*L,L)
 
-    def run(self, lib, state, tfinal=0.2):
+        if e1 or e2:
+            print "Run crashed! Sorry...", e1, e2
+            break
 
-        from numpy import zeros
+        U += dt*L
+        t += dt
 
-        self.verbose = False
-        Nx = self.Nx
-        P = zeros((Nx,8))
-        U = zeros((Nx,8))
-        L = zeros((Nx,8))
+        U[ 0:4,   :] = U[   4,:]
+        U[Nx-4:Nx,:] = U[Nx-5,:]
 
-        for i in range(8):
-            P[:Nx/2,i] = self.L_state[i]
-            P[Nx/2:,i] = self.R_state[i]
+        if verbose:
+            print "t =", t
 
-        state.adiabatic_gamma = self.problem.adiabatic_gamma
-
-        lib.set_state(state)
-        lib.initialize(P,Nx)
-        lib.prim_to_cons_array(P,U)
-
-        dx  = 1.0 / Nx
-        t   = 0.0
-        dt  = self.CFL * dx
-
-        while t < tfinal:
-            e1 = lib.dUdt_1d(U,L)
-            e2 = lib.dUdt_1d(U + 0.5*dt*L,L)
-
-            if e1 or e2:
-                print "Run crashed! Sorry..."
-                break
-
-            U += dt*L
-            t += dt
-
-            U[ 0:4,   :] = U[   4,:]
-            U[Nx-4:Nx,:] = U[Nx-5,:]
-
-            if self.verbose:
-                print "t =", t
-
-        lib.cons_to_prim_array(U,P)
-        lib.finalize()
-        return P
+    lib.cons_to_prim_array(U,P)
+    lib.finalize()
+    return P
 
 
 
@@ -74,15 +51,16 @@ def sr_shocktube():
     import rmhd
 
     problem = SRShockTube2()
-    driver  = TestProblemDriver(problem, Nx=100, CFL=0.8)
     state   = rmhd.LibraryState()
 
-    P1 = driver.run(rmhd._lib1, state, tfinal=0.4)
+    P1 = run_1d_problem(rmhd._lib2, state, problem, CFL=0.5, tfinal=0.4)
     P2 = rmhd.riemann.exact_sr_vt(problem, tfinal=0.4)
 
     rmhd.visual.shocktube(P1, label="lib2", linestyle='--')
     rmhd.visual.shocktube(P2, label="exact", linestyle='-', marker='None', lw=2)
     show()
+
+
 
 
 def compare_libs_1_and_2():
@@ -91,12 +69,12 @@ def compare_libs_1_and_2():
     import rmhd
 
     problem = RMHDShockTube1(L={'Pre':10.0})
-    driver  = TestProblemDriver(problem, Nx=256, CFL=0.8)
+
     state1  = rmhd.LibraryState()
     state2  = rmhd.LibraryState(mode_reconstruct=1)
 
-    P1 = driver.run(rmhd._lib1, state1)
-    P2 = driver.run(rmhd._lib2, state2)
+    P1 = run_1d_problem(rmhd._lib1, state1, problem, CFL=0.5, tfinal=0.4)
+    P2 = run_1d_problem(rmhd._lib2, state2, problem, CFL=0.5, tfinal=0.4)
 
     rmhd.visual.shocktube(P1, label="run1", linestyle='--')
     rmhd.visual.shocktube(P2, label="run2", linestyle='-', mfc='None')

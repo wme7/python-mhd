@@ -47,15 +47,17 @@ struct LibraryState get_state()
   return lib_state;
 }
 
-int initialize(double *P, int Nx)
+int initialize(double *P, int Nx, int Ny, int Nz)
 {
-  stride[0] = Nx*8;
-  stride[1] = 1*8;
-  stride[2] = 0;
-  stride[3] = 0;
+  stride[0] = Nx*Ny*Nz*8;
+  stride[1] =    Ny*Nz*8;
+  stride[2] =       Nz*8;
+  stride[3] =          8;
   dimension = 1;
 
   dx = 1.0 / Nx;
+  dy = 1.0 / Ny;
+  dz = 1.0 / Nz;
 
   PrimitiveArray = (double*) malloc(stride[0]*sizeof(double));
   FluxInterArray = (double*) malloc(stride[0]*sizeof(double));
@@ -96,7 +98,7 @@ inline double min3(double a, double b, double c)
 int new_QuarticEquation(double d4, double d3, double d2, double d1, double d0);
 int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr);
 int reconstruct_use_4vel(const double *P0, double *Pl, double *Pr);
-int Fiph              (const double *U, double *F);
+int Fiph              (const double *P, double *F);
 int dUdt_1d           (const double *U, double *L);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
@@ -163,6 +165,9 @@ int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr)
   const size_t S = stride[dimension];
   const size_t T = 2*S;
 
+  // Here, Pr refers to the left edge of cell i+1
+  //       Pl refers to the rght edge of cell i
+
   Pr[rho] = P0[S+rho] - 0.5*plm_minmod(P0[ 0+rho], P0[S+rho], P0[T+rho]);
   Pl[rho] = P0[0+rho] + 0.5*plm_minmod(P0[-S+rho], P0[0+rho], P0[S+rho]);
 
@@ -194,49 +199,10 @@ int reconstruct_use_4vel(const double *P0, double *Pl, double *Pr)
   const size_t S = stride[dimension];
   const size_t T = 2*S;
 
-  const double v0[4] = { 1, P0[-S+vx], P0[-S+vy], P0[-S+vz] };
-  const double v1[4] = { 1, P0[ 0+vx], P0[ 0+vy], P0[ 0+vz] };
-  const double v2[4] = { 1, P0[ S+vx], P0[ S+vy], P0[ S+vz] };
-  const double v3[4] = { 1, P0[ T+vx], P0[ T+vy], P0[ T+vz] };
-
-  const double W0 = 1.0 / sqrt(1.0 - (v0[1]*v0[1]+v0[2]*v0[2]+v0[3]*v0[3]));
-  const double W1 = 1.0 / sqrt(1.0 - (v1[1]*v1[1]+v1[2]*v1[2]+v1[3]*v1[3]));
-  const double W2 = 1.0 / sqrt(1.0 - (v2[1]*v2[1]+v2[2]*v2[2]+v2[3]*v2[3]));
-  const double W3 = 1.0 / sqrt(1.0 - (v3[1]*v3[1]+v3[2]*v3[2]+v3[3]*v3[3]));
-
-  Pr[vx] = P0[S+vx]*W2 - 0.5*plm_minmod(P0[ 0+vx]*W1, P0[S+vx]*W2, P0[T+vx]*W3);
-  Pl[vx] = P0[0+vx]*W1 + 0.5*plm_minmod(P0[-S+vx]*W0, P0[0+vx]*W1, P0[S+vx]*W2);
-
-  Pr[vy] = P0[S+vy]*W2 - 0.5*plm_minmod(P0[ 0+vy]*W1, P0[S+vy]*W2, P0[T+vy]*W3);
-  Pl[vy] = P0[0+vy]*W1 + 0.5*plm_minmod(P0[-S+vy]*W0, P0[0+vy]*W1, P0[S+vy]*W2);
-
-  Pr[vz] = P0[S+vz]*W2 - 0.5*plm_minmod(P0[ 0+vz]*W1, P0[S+vz]*W2, P0[T+vz]*W3);
-  Pl[vz] = P0[0+vz]*W1 + 0.5*plm_minmod(P0[-S+vz]*W0, P0[0+vz]*W1, P0[S+vz]*W2);
-
-  const double Wr = 1.0 / (1.0 - (Pr[vx]*Pr[vx] + Pr[vy]*Pr[vy] + Pr[vz]*Pr[vz]));
-  const double Wl = 1.0 / (1.0 - (Pl[vx]*Pl[vx] + Pl[vy]*Pl[vy] + Pl[vz]*Pl[vz]));
-
-  Pr[vx] /= Wr;  Pr[vy] /= Wr;  Pr[vz] /= Wr;
-  Pl[vx] /= Wl;  Pl[vy] /= Wl;  Pl[vz] /= Wl;
-
-  Pr[rho] = P0[S+rho] - 0.5*plm_minmod(P0[ 0+rho], P0[S+rho], P0[T+rho]);
-  Pl[rho] = P0[0+rho] + 0.5*plm_minmod(P0[-S+rho], P0[0+rho], P0[S+rho]);
-
-  Pr[pre] = P0[S+pre] - 0.5*plm_minmod(P0[ 0+pre], P0[S+pre], P0[T+pre]);
-  Pl[pre] = P0[0+pre] + 0.5*plm_minmod(P0[-S+pre], P0[0+pre], P0[S+pre]);
-
-  Pr[Bx] = P0[S+Bx] - 0.5*plm_minmod(P0[ 0+Bx], P0[S+Bx], P0[T+Bx]);
-  Pl[Bx] = P0[0+Bx] + 0.5*plm_minmod(P0[-S+Bx], P0[0+Bx], P0[S+Bx]);
-
-  Pr[By] = P0[S+By] - 0.5*plm_minmod(P0[ 0+By], P0[S+By], P0[T+By]);
-  Pl[By] = P0[0+By] + 0.5*plm_minmod(P0[-S+By], P0[0+By], P0[S+By]);
-
-  Pr[Bz] = P0[S+Bz] - 0.5*plm_minmod(P0[ 0+Bz], P0[S+Bz], P0[T+Bz]);
-  Pl[Bz] = P0[0+Bz] + 0.5*plm_minmod(P0[-S+Bz], P0[0+Bz], P0[S+Bz]);
+  // not implemented in this revision
 
   return 0;
 }
-
 
 int dUdt_1d(const double *U, double *L)
 {
@@ -246,7 +212,7 @@ int dUdt_1d(const double *U, double *L)
   int failures = cons_to_prim_array(U,P);
 
   dimension = 1;
-  Fiph(U,F);
+  Fiph(P,F);
 
   size_t S = stride[dimension];
   int i;
@@ -256,7 +222,37 @@ int dUdt_1d(const double *U, double *L)
     }
   return failures;
 }
-int Fiph(const double *U, double *F)
+int dUdt_2d(const double *U, double *L)
+{
+  double *P = PrimitiveArray;
+  double *F = FluxInterArray;
+
+  int S,i;
+  int failures = cons_to_prim_array(U,P);
+  if (failures) return failures;
+
+  dimension = 1;
+  Fiph(P,F);
+  S = stride[dimension];
+  for (i=S; i<stride[0]; ++i)
+    {
+      L[i] = -(F[i] - F[i-S]) / dx;
+    }
+
+  dimension = 2;
+  Fiph(P,F);
+  S = stride[dimension];
+  for (i=S; i<stride[0]; ++i)
+    {
+      L[i] -= (F[i] - F[i-S]) / dy;
+    }
+  return 0;
+}
+int dUdt_3d(const double *U, double *L)
+{
+
+}
+int Fiph(const double *P, double *F)
 {
   const int S = stride[dimension];
 
@@ -271,26 +267,26 @@ int Fiph(const double *U, double *F)
       double Ul[8], Ur[8];
       double Pl[8], Pr[8];
       double epl, epr, eml, emr;
-      double *P = &PrimitiveArray[i];
+      const double *P0 = &P[i];
 
       switch (lib_state.mode_reconstruct)
         {
 
         case Reconstruct_PiecewiseConstant:
-          memcpy(Pl, P  , 8*sizeof(double));
-          memcpy(Pr, P+8, 8*sizeof(double));
+          memcpy(Pl, P0  , 8*sizeof(double));
+          memcpy(Pr, P0+8, 8*sizeof(double));
           break;
 
         case Reconstruct_PLM3Velocity:
-          reconstruct_use_3vel(P, Pl, Pr);
+          reconstruct_use_3vel(P0, Pl, Pr);
           break;
 
         case Reconstruct_PLM4Velocity:
-          reconstruct_use_4vel(P, Pl, Pr);
+          reconstruct_use_4vel(P0, Pl, Pr);
           break;
 
 	default:
-	  reconstruct_use_3vel(P, Pl, Pr);
+	  reconstruct_use_3vel(P0, Pl, Pr);
           break;
         }
 

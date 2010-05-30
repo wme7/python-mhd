@@ -62,11 +62,16 @@ class LibraryState(Structure):
 const_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS'))
 write_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS', 'WRITEABLE'))
 
+_lib2.dUdt_2d.argtypes = [const_array, write_array]
+_lib2.dUdt_2d.restype = c_int
+
 for lib in [_lib1, _lib2]:
 
-    lib.initialize        .argtypes = [const_array, c_int]
+    lib.initialize        .argtypes = [const_array, c_int, c_int, c_int]
     lib.finalize          .argtypes = [ ]
     lib.dUdt_1d           .argtypes = [const_array, write_array]
+    lib.dUdt_2d           .argtypes = [const_array, write_array]
+    lib.dUdt_3d           .argtypes = [const_array, write_array]
     lib.Fiph              .argtypes = [const_array, write_array]
     lib.prim_to_cons_array.argtypes = [const_array, write_array]
     lib.cons_to_prim_array.argtypes = [const_array, write_array]
@@ -74,9 +79,12 @@ for lib in [_lib1, _lib2]:
     lib.initialize        .restype = c_int
     lib.finalize          .restype = c_int
     lib.dUdt_1d           .restype = c_int
+    lib.dUdt_2d           .restype = c_int
+    lib.dUdt_3d           .restype = c_int
     lib.Fiph              .restype = c_int
     lib.prim_to_cons_array.restype = c_int
     lib.cons_to_prim_array.restype = c_int
 
     lib.set_state.argtypes = [ LibraryState ]
     lib.get_state.restype  =   LibraryState
+
