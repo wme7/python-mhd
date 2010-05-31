@@ -154,7 +154,7 @@ int solve_quartic_approx2(double *x);
 
 int report_cons_to_prim_failure(const double *U, const double *P);
 int report_nonphysical_failure (const double *U, const double *P);
-
+int hll_flux(const double *pl, const double *pr, double *U, double *F, double s);
 
 /*------------------------------------------------------------------------------
  *
@@ -217,16 +217,41 @@ inline double eos_cs2(double Rho, double Pre)
 
 
 
-int hll_flux(double *Ul, double *Ur, double *Fl, double *Fr,
-             double eml, double epl, double emr, double epr, double *fiph)
+int hll_flux(const double *pl, const double *pr, double *U, double *F, double s)
 {
   int i;
-  double am = min3(eml, emr, 0.0);
-  double ap = max3(epl, epr, 0.0);
+  double epl, epr, eml, emr;
+  double Ul[8], Ur[8];
+  double Pl[8], Pr[8];
+  double Fl[8], Fr[8];
+
+  memcpy(Pl,pl,8*sizeof(double));
+  memcpy(Pr,pr,8*sizeof(double));
+
+  prim_to_cons_point(Pl,Ul);
+  prim_to_cons_point(Pr,Ur);
+
+  rmhd_flux_and_eval(Ul, Pl, Fl, &epl, &eml);
+  rmhd_flux_and_eval(Ur, Pr, Fr, &epr, &emr);
+
+  double ap = (epl>epr) ? epl : epr;
+  double am = (eml<emr) ? eml : emr;
+
+  double F_hll[8], U_hll[8];
   for (i=0; i<8; ++i)
     {
-      fiph[i] = (ap*Fl[i] - am*Fr[i] + ap*am*(Ur[i] - Ul[i])) / (ap - am);
+      U_hll[i] = (ap*Ur[i] - am*Ul[i] +       (Fl[i] - Fr[i])) / (ap - am);
+      F_hll[i] = (ap*Fl[i] - am*Fr[i] + ap*am*(Ur[i] - Ul[i])) / (ap - am);
     }
+
+  if      (         s<=am ) for (i=0; i<8; ++i) U[i] = Ul   [i];
+  else if ( ap<s && s<=ap ) for (i=0; i<8; ++i) U[i] = U_hll[i];
+  else if ( ap<s          ) for (i=0; i<8; ++i) U[i] = Ur   [i];
+
+  if      (         s<=am ) for (i=0; i<8; ++i) F[i] = Fl   [i];
+  else if ( ap<s && s<=ap ) for (i=0; i<8; ++i) F[i] = F_hll[i];
+  else if ( ap<s          ) for (i=0; i<8; ++i) F[i] = Fr   [i];
+
   return 0;
 }
 
@@ -401,13 +426,8 @@ int Fiph(const double *P, double *F)
           break;
         }
 
-      prim_to_cons_point(Pl,Ul);
-      prim_to_cons_point(Pr,Ur);
-
-      rmhd_flux_and_eval(Ul, Pl, Fl, &epl, &eml);
-      rmhd_flux_and_eval(Ur, Pr, Fr, &epr, &emr);
-
-      hll_flux(Ul, Ur, Fl, Fr, eml, epl, emr, epr, &F[i]);
+      double U[8];
+      hll_flux(Pl, Pr, U, &F[i], 0.0);
     }
   for (i=stride[0]-S*2; i<stride[0]; ++i)
     {

@@ -2,11 +2,11 @@
 
 
 
-def hlld_unit_test():
+def riemann_unit_test():
 
     import rmhd
 
-    problem = RMHDShockTube2()
+    problem = RMHDShockTube1()
     Pl, Pr = problem.get_states()
 
     from numpy import zeros, array, linspace
@@ -24,20 +24,24 @@ def hlld_unit_test():
 
     Nx = 1024
 
-    P_all = zeros((Nx,8))
+    P_hll  = zeros((Nx,8))
+    P_hllc = zeros((Nx,8))
     x = linspace(-1.5,1.5,Nx)
 
     rmhd._lib.set_state(rmhd.LibraryState(cons_to_prim_use_estimate=1))
     for i in range(Nx):
 
         U = zeros(8)
+
+        rmhd._lib.hll_flux(Pl,Pr,U,F,x[i])
+        rmhd._lib.cons_to_prim_point(U,P_hll[i,:])
+
         rmhd._lib.hllc_flux(Pl,Pr,U,F,x[i])
-        rmhd._lib.cons_to_prim_point(U,P)
-        P_all[i,:] = P
+        rmhd._lib.cons_to_prim_point(U,P_hllc[i,:])
 
-    rmhd.visual.shocktube(P_all, label="HLLC", linestyle='--', mfc='None')
+    rmhd.visual.shocktube(P_hll , x0=-1.5, x1=1.5, label="HLL" , linestyle='-.', marker='None', lw=6)
+    rmhd.visual.shocktube(P_hllc, x0=-1.5, x1=1.5, label="HLLC", linestyle='-' , marker='None')
     show()
-
 
 
 def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=False):
@@ -206,5 +210,5 @@ if __name__ == "__main__":
     #sr_shocktube()
     #compare_reconstruct()
     #compare_quartic()
-    hlld_unit_test()
+    riemann_unit_test()
     #library_dead_unit_test()

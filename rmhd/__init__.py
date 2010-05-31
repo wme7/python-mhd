@@ -72,6 +72,7 @@ _lib.prim_to_cons_array.argtypes = [const_array, write_array, c_int]
 _lib.cons_to_prim_array.argtypes = [const_array, write_array, c_int]
 _lib.prim_to_cons_point.argtypes = [const_array, write_array]
 _lib.cons_to_prim_point.argtypes = [const_array, write_array]
+_lib.hll_flux          .argtypes = [const_array]*2 + [write_array]*2 + [c_double]
 _lib.hllc_flux         .argtypes = [const_array]*2 + [write_array]*2 + [c_double]
 
 _lib.initialize        .restype = c_int

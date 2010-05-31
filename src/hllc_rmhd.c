@@ -105,15 +105,15 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
   Ul_[By] = Ur_[By] = P_[By];
   Ul_[Bz] = Ur_[Bz] = P_[Bz];
 
-  if      (         s<=am ) for (i=0; i<8; ++i) F[i] = Fl[i];
-  else if ( am<s && s<=vx_) for (i=0; i<8; ++i) F[i] = Fl[i] + am*(Ul_[i]-Ul[i]);
-  else if (vx_<s && s<=ap ) for (i=0; i<8; ++i) F[i] = Fr[i] + ap*(Ur_[i]-Ur[i]);
-  else if ( ap<s          ) for (i=0; i<8; ++i) F[i] = Fr[i];
-
   if      (         s<=am ) for (i=0; i<8; ++i) U[i] = Ul [i];
   else if ( am<s && s<=vx_) for (i=0; i<8; ++i) U[i] = Ul_[i];
   else if (vx_<s && s<=ap ) for (i=0; i<8; ++i) U[i] = Ur_[i];
   else if ( ap<s          ) for (i=0; i<8; ++i) U[i] = Ur [i];
+
+  if      (         s<=am ) for (i=0; i<8; ++i) F[i] = Fl[i];
+  else if ( am<s && s<=vx_) for (i=0; i<8; ++i) F[i] = Fl[i] + am*(Ul_[i]-Ul[i]);
+  else if (vx_<s && s<=ap ) for (i=0; i<8; ++i) F[i] = Fr[i] + ap*(Ur_[i]-Ur[i]);
+  else if ( ap<s          ) for (i=0; i<8; ++i) F[i] = Fr[i];
 
   U[tau] -= U[ddd]; // Change in convention of total energy
   F[tau] -= F[ddd];
