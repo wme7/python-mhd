@@ -25,10 +25,10 @@ enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz }; // Conserved
 enum { rho, pre, vx, vy, vz };             // Primitive
 
 int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am);
+int prim_to_cons_point(const double *P, double *U);
+int cons_to_prim_point(const double *U, double *P);
 
-int hllc_flux(const double *ul, const double *ur,
-	      const double *pl, const double *pr,
-	      double *U, double *F, double s)
+int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s)
 {
   int i;
   double epl, epr, eml, emr;
@@ -36,10 +36,11 @@ int hllc_flux(const double *ul, const double *ur,
   double Pl[8], Pr[8];
   double Fl[8], Fr[8];
 
-  memcpy(Ul,ul,8*sizeof(double));
   memcpy(Pl,pl,8*sizeof(double));
-  memcpy(Ur,ur,8*sizeof(double));
   memcpy(Pr,pr,8*sizeof(double));
+
+  prim_to_cons_point(Pl,Ul);
+  prim_to_cons_point(Pr,Ur);
 
   rmhd_flux_and_eval(Ul, Pl, Fl, &epl, &eml);
   rmhd_flux_and_eval(Ur, Pr, Fr, &epr, &emr);

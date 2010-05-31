@@ -6,10 +6,11 @@ def hlld_unit_test():
 
     import rmhd
 
-    problem = RMHDShockTube1()
+    problem = RMHDShockTube2()
     Pl, Pr = problem.get_states()
 
     from numpy import zeros, array, linspace
+    from pylab import show
 
     F  = zeros(8)
     U  = zeros(8)
@@ -21,24 +22,22 @@ def hlld_unit_test():
     Pl = array(Pl)
     Pr = array(Pr)
 
-    rmhd._lib.prim_to_cons_point(Pl,Ul)
-    rmhd._lib.prim_to_cons_point(Pr,Ur)
+    Nx = 1024
 
-    Nx = 100
+    P_all = zeros((Nx,8))
+    x = linspace(-1.5,1.5,Nx)
 
-    P_domain = zeros((Nx,8))
-    x = linspace(-1,1,Nx)
+    rmhd._lib.set_state(rmhd.LibraryState(cons_to_prim_use_estimate=1))
     for i in range(Nx):
 
         U = zeros(8)
-        rmhd._lib.hllc_flux(Ul,Ur,Pl,Pr,U,F,x[i])
-        print rmhd._lib.cons_to_prim_point(U,P)
-        P_domain[i,:] = P
+        rmhd._lib.hllc_flux(Pl,Pr,U,F,x[i])
+        rmhd._lib.cons_to_prim_point(U,P)
+        P_all[i,:] = P
 
-
-    from pylab import plot, show
-    plot(x,P_domain[:,0])
+    rmhd.visual.shocktube(P_all, label="HLLC", linestyle='--', mfc='None')
     show()
+
 
 
 def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=False):
@@ -207,5 +206,5 @@ if __name__ == "__main__":
     #sr_shocktube()
     #compare_reconstruct()
     #compare_quartic()
-    #hlld_unit_test()
-    library_dead_unit_test()
+    hlld_unit_test()
+    #library_dead_unit_test()
