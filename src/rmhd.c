@@ -37,6 +37,9 @@ enum { rho, pre, vx, vy, vz };             // Primitive
 
 // Modes for selecting the strategy of the solver
 
+enum RiemannSolverMode { RiemannSolver_HLL,
+			 RiemannSolver_HLLC };
+
 enum ReconstructMode { Reconstruct_PiecewiseConstant,
 		       Reconstruct_PLM3Velocity,
 		       Reconstruct_PLM4Velocity };
@@ -64,18 +67,18 @@ struct LibraryState
   double adiabatic_gamma;
   double plm_theta;
 
+  int mode_riemann_solver;
   int mode_reconstruct;
   int mode_quartic_solver;
-  int mode_library_operation;
 } lib_state = { 0,0,0,
 		0.0,1.4,2.0,
+		RiemannSolver_HLL,
 		Reconstruct_PLM4Velocity,
 		QuarticSolver_Exact };
 
 double *PrimitiveArray;
 double *FluxInterArray;
 double *lib_ux, *lib_uy, *lib_uz;
-
 
 
 int set_state(struct LibraryState state)
@@ -154,7 +157,8 @@ int solve_quartic_approx2(double *x);
 
 int report_cons_to_prim_failure(const double *U, const double *P);
 int report_nonphysical_failure (const double *U, const double *P);
-int hll_flux(const double *pl, const double *pr, double *U, double *F, double s);
+int hll_flux (const double *pl, const double *pr, double *U, double *F, double s);
+int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s);
 
 /*------------------------------------------------------------------------------
  *
@@ -245,11 +249,11 @@ int hll_flux(const double *pl, const double *pr, double *U, double *F, double s)
     }
 
   if      (         s<=am ) for (i=0; i<8; ++i) U[i] = Ul   [i];
-  else if ( ap<s && s<=ap ) for (i=0; i<8; ++i) U[i] = U_hll[i];
+  else if ( am<s && s<=ap ) for (i=0; i<8; ++i) U[i] = U_hll[i];
   else if ( ap<s          ) for (i=0; i<8; ++i) U[i] = Ur   [i];
 
   if      (         s<=am ) for (i=0; i<8; ++i) F[i] = Fl   [i];
-  else if ( ap<s && s<=ap ) for (i=0; i<8; ++i) F[i] = F_hll[i];
+  else if ( am<s && s<=ap ) for (i=0; i<8; ++i) F[i] = F_hll[i];
   else if ( ap<s          ) for (i=0; i<8; ++i) F[i] = Fr   [i];
 
   return 0;
@@ -342,7 +346,7 @@ int dUdt_1d(const double *U, double *L)
   double *F = FluxInterArray;
   int failures,S,i;
 
-  failures = cons_to_prim_array(U,P,stride[0]);
+  failures = cons_to_prim_array(U,P,stride[0]/8);
   if (failures) return failures;
 
   dimension = 1;
@@ -364,7 +368,7 @@ int dUdt_2d(const double *U, double *L)
   double *F = FluxInterArray;
 
   int S,i;
-  int failures = cons_to_prim_array(U,P,stride[0]);
+  int failures = cons_to_prim_array(U,P,stride[0]/8);
   if (failures) return failures;
 
   dimension = 1;
@@ -427,7 +431,19 @@ int Fiph(const double *P, double *F)
         }
 
       double U[8];
-      hll_flux(Pl, Pr, U, &F[i], 0.0);
+      switch (lib_state.mode_riemann_solver)
+	{
+	case RiemannSolver_HLL:
+	  hll_flux (Pl, Pr, U, &F[i], 0.0);
+	  break;
+	case RiemannSolver_HLLC:
+	  hllc_flux(Pl, Pr, U, &F[i], 0.0);
+	  break;
+	default:
+	  hll_flux (Pl, Pr, U, &F[i], 0.0);
+	  break;
+	}
+
     }
   for (i=stride[0]-S*2; i<stride[0]; ++i)
     {
@@ -708,7 +724,7 @@ int cons_to_prim_array(const double *U, double *P, int N)
     }
   /* ----------------------------------------------------------------------------- */
 
-  for (i=0; i<N; i+=8)
+  for (i=0; i<N*8; i+=8)
     {
       const double *Ui = &U[i];
       double       *Pi = &P[i];
@@ -756,7 +772,7 @@ int prim_to_cons_point(const double *P, double *U)
 int prim_to_cons_array(const double *P, double *U, int N)
 {
   int i;
-  for (i=0; i<N; i+=8)
+  for (i=0; i<N*8; i+=8)
     {
       prim_to_cons_point(&P[i], &U[i]);
     }

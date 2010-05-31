@@ -31,6 +31,7 @@ class LibraryState(Structure):
   double adiabatic_gamma;
   double plm_theta;
 
+  int mode_riemann_solver;
   int mode_reconstruct;
   int mode_quartic_solver;"""
 
@@ -48,6 +49,7 @@ class LibraryState(Structure):
         self.adiabatic_gamma           = 1.4
         self.plm_theta                 = 2.0
 
+        self.mode_riemann_solver       = 0 # HLL approximate solver
         self.mode_quartic_solver       = 0 # Exact solver
         self.mode_reconstruct          = 2 # PLM on 4-velocity
 

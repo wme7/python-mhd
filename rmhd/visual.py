@@ -1,5 +1,5 @@
 
-def shocktube(P, x0=-1, x1=1, **kwargs):
+def shocktube(P, extent=(-1,1), **kwargs):
 
     from pylab import sqrt, linspace, subplot, plot, text, xlabel, figure, show
     from pylab import subplots_adjust, setp, gca, LinearLocator, rcParams, legend
@@ -16,7 +16,7 @@ def shocktube(P, x0=-1, x1=1, **kwargs):
     plot_args.update(kwargs)
     rcParams.update({'axes.labelsize':16, 'ytick.major.pad':8})
 
-    x = linspace(x0,x1,P.shape[0])
+    x = linspace(extent[0],extent[1],P.shape[0])
     g = 1 / sqrt(1-(vx**2+vy**2+vz**2))
 
     ax = subplot(2,3,1)
