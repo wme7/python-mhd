@@ -4,28 +4,86 @@ to_array = lambda S: [S['Rho'], S['Pre'],
                       S['v'][0], S['v'][1], S['v'][2],
                       S['B'][0], S['B'][1], S['B'][2]]
 
+
+class CylindricalProblem:
+
+    def __init__(self, I={ }, O={ }, gamma=1.4):
+
+        self._setup()
+
+        self.I_state.update(I)
+        self.O_state.update(O)
+        self.adiabatic_gamma = gamma
+
+
+    def initial_model(self, P):
+
+        assert len(P.shape) is 3
+        from numpy import array
+
+        Nx, Ny = P.shape[0:2]
+
+        for i in range(Nx):
+            for j in range(Ny):
+                if (i-Nx/2)**2 + (j-Ny/2)**2 < (0.1*(Nx+Ny))**2:
+                    P[i,j,:] = array(to_array(self.I_state))
+                else:
+                    P[i,j,:] = array(to_array(self.O_state))
+
+
 class ShockTubeProblem:
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, L={ }, R={ }, gamma=1.4, orientation='x'):
 
         self._setup()
 
         self.L_state.update(L)
         self.R_state.update(R)
         self.adiabatic_gamma = gamma
+        self.orientation = orientation
 
     def initial_model(self, P):
         
-        assert len(P.shape) is 2
-        Nx = P.shape[0]
+        if len(P.shape) is 2:
+            Nx = P.shape[0]
 
-        for i in range(8):
-            P[:Nx/2,i] = to_array(self.L_state)[i]
-            P[Nx/2:,i] = to_array(self.R_state)[i]
+            for i in range(8):
+                P[:Nx/2,i] = to_array(self.L_state)[i]
+                P[Nx/2:,i] = to_array(self.R_state)[i]
+
+        elif len(P.shape) is 3:
+
+            Nx, Ny = P.shape[0:2]
+
+            if self.orientation == 'x':
+                for i in range(8):
+                    P[:Nx/2,:,i] = to_array(self.L_state)[i]
+                    P[Nx/2:,:,i] = to_array(self.R_state)[i]
+
+            elif self.orientation == 'y':
+                for i in range(8):
+                    P[:,:Ny/2,i] = to_array(self.L_state)[i]
+                    P[:,Ny/2:,i] = to_array(self.R_state)[i]
+
+        else: raise Exception
+
 
     def get_states(self):
 
         return to_array(self.L_state), to_array(self.R_state)
+
+
+class RMHDCylindricalA(CylindricalProblem):
+
+    def __init__(self, I={ }, O={ }, gamma=1.4):
+
+        CylindricalProblem.__init__(self, I=I, O=O, gamma=gamma)
+
+    def _setup(self):
+
+        self.I_state = { 'Rho':1.0, 'Pre':1.00, 'v': [0,0,0], 'B': [0,0,0] }
+        self.O_state = { 'Rho':1.0, 'Pre':0.01, 'v': [0,0,0], 'B': [0,0,0] }
+
 
 
 class SRShockTube1(ShockTubeProblem):

@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
 
-def riemann_unit_test():
+def riemann_wave_patter():
 
     from rmhd import _lib, visual, LibraryState
     from numpy import zeros, array, linspace
     from pylab import show
 
-    problem = RMHDShockTube2()
+    problem = RMHDShockTube2(L={'B':[1e-4,2.0,2.0]}, R={'B':[1e-4,-2.0,2.0]})
     Pl, Pr = problem.get_states()
 
     Pl = array(Pl)
@@ -26,15 +26,15 @@ def riemann_unit_test():
 
         _lib.hll_flux(Pl,Pr,U,F,x[i])
         if _lib.cons_to_prim_point(U,P_hll[i,:]):
-            print "Warning! HLL generated non-invertible intermediate cons state:\n", U
+            print "Warning! HLL generated non-invertible intermediate cons state."
 
         _lib.hllc_flux(Pl,Pr,U,F,x[i])
         if _lib.cons_to_prim_point(U,P_hllc[i,:]):
-            print "Warning! HLLC generated non-invertible intermediate cons state:\n", U
+            print "Warning! HLLC generated non-invertible intermediate cons state."
 
 
-    visual.shocktube(P_hll , extent=(-1.5,1.5), label="HLL" , linestyle='-.', marker='None', lw=6)
-    visual.shocktube(P_hllc, extent=(-1.5,1.5), label="HLLC", linestyle='-' , marker='None')
+    visual.shocktube(P_hll , x=(-1.5,1.5), label="HLL" , linestyle='-.', marker='None', lw=6)
+    visual.shocktube(P_hllc, x=(-1.5,1.5), label="HLLC", linestyle='-' , marker='None')
     show()
 
 
@@ -87,6 +87,64 @@ def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=Fal
     lib.cons_to_prim_array(U,P,Nx)
     lib.finalize()
     print "Solver averaged %f us/zone" % (ttltime / (Nx*8*n_cycle)*1e6)
+    return P
+
+
+
+def run_2d_problem(lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, verbose=True):
+
+    from numpy import zeros
+
+    P = zeros((Nx,Ny,8))
+    U = zeros((Nx,Ny,8))
+    L = zeros((Nx,Ny,8))
+
+    state.adiabatic_gamma = 1.4
+    problem.initial_model(P)
+
+    lib.set_state(state)
+    lib.initialize(P,Nx,Ny,1)
+    lib.prim_to_cons_array(P,U,Nx*Ny)
+
+    dx  = 1.0 / Nx
+    dy  = 1.0 / Ny
+    t   = 0.0
+    dt  = CFL * min([dx,dy])
+
+    from time import time
+
+    ttltime = 0.0
+    n_cycle = 0
+    while t < tfinal:
+
+        start = time()
+
+        e1 = lib.dUdt_2d(U,L)
+        e2 = lib.dUdt_2d(U + 0.5*dt*L,L)
+
+        if e1 or e2:
+            print "Run crashed! Sorry...", e1, e2
+            #break
+
+        U += dt*L
+        t += dt
+        n_cycle += 1
+
+        for i in range(4): # Boundary conditions
+            U[   i  ,:] = U[   4,:]
+            U[Nx-i-1,:] = U[Nx-5,:]
+
+            U[:,   i  ] = U[:,   4]
+            U[:,Ny-i-1] = U[:,Ny-5]
+
+        ttltime += time()-start
+
+        if verbose:
+            print "t =", t
+
+    lib.cons_to_prim_array(U,P,Nx*Ny)
+    lib.finalize()
+    print "Solver averaged %f us/zone" % (ttltime / (Nx*Ny*8*n_cycle)*1e6)
     return P
 
 
@@ -183,6 +241,7 @@ def compare_quartic():
     show()
 
 
+
 def library_dead_unit_test():
 
     import rmhd
@@ -223,13 +282,27 @@ def library_dead_unit_test():
     print "\tWith aweful guess:" , passfail(rmhd._lib.cons_to_prim_array(U_all,P_all*0.0,Nx))
 
 
+def test_2d():
+
+    from rmhd import _lib, LibraryState
+    from numpy import array, zeros
+    from pylab import show, imshow, colorbar
+
+    state = LibraryState(plm_theta=2.0, mode_reconstruct=0)
+    problem = RMHDCylindricalA()
+    P = run_2d_problem(_lib, state, problem, Nx=128, Ny=128, CFL=0.4, tfinal=0.2, verbose=True)
+    imshow(P[:,:,1])
+    colorbar()
+    show()
+
 
 if __name__ == "__main__":
 
     from rmhd.testbench import *
     #sr_shocktube()
-    compare_riemann_solver()
+    #compare_riemann_solver()
     #compare_reconstruct()
     #compare_quartic()
-    #riemann_unit_test()
+    #riemann_wave_patter()
     #library_dead_unit_test()
+    test_2d()

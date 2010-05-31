@@ -301,6 +301,9 @@ int reconstruct_use_4vel(const double *P0,
   const size_t S = stride[dimension];
   const size_t T = 2*S;
 
+  const size_t U = S/8;
+  const size_t V = T/8;
+
   // Here, Pr refers to the left edge of cell i+1
   //       Pl refers to the rght edge of cell i
 
@@ -319,14 +322,14 @@ int reconstruct_use_4vel(const double *P0,
   Pr[Bz] = P0[S+Bz] - 0.5*plm_minmod(P0[ 0+Bz], P0[S+Bz], P0[T+Bz]);
   Pl[Bz] = P0[0+Bz] + 0.5*plm_minmod(P0[-S+Bz], P0[0+Bz], P0[S+Bz]);
 
-  const double ux_r = ux[1] - 0.5*plm_minmod(ux[ 0], ux[1], ux[2]);
-  const double ux_l = ux[0] + 0.5*plm_minmod(ux[-1], ux[0], ux[1]);
+  const double ux_r = ux[U] - 0.5*plm_minmod(ux[ 0], ux[U], ux[V]);
+  const double ux_l = ux[0] + 0.5*plm_minmod(ux[-U], ux[0], ux[U]);
 
-  const double uy_r = uy[1] - 0.5*plm_minmod(uy[ 0], uy[1], uy[2]);
-  const double uy_l = uy[0] + 0.5*plm_minmod(uy[-1], uy[0], uy[1]);
+  const double uy_r = uy[U] - 0.5*plm_minmod(uy[ 0], uy[U], uy[V]);
+  const double uy_l = uy[0] + 0.5*plm_minmod(uy[-U], uy[0], uy[U]);
 
-  const double uz_r = uz[1] - 0.5*plm_minmod(uz[ 0], uz[1], uz[2]);
-  const double uz_l = uz[0] + 0.5*plm_minmod(uz[-1], uz[0], uz[1]);
+  const double uz_r = uz[U] - 0.5*plm_minmod(uz[ 0], uz[U], uz[V]);
+  const double uz_l = uz[0] + 0.5*plm_minmod(uz[-U], uz[0], uz[U]);
 
   const double Wr = sqrt(1 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
   const double Wl = sqrt(1 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
@@ -366,8 +369,8 @@ int dUdt_2d(const double *U, double *L)
 
   double *P = PrimitiveArray;
   double *F = FluxInterArray;
-
   int S,i;
+
   int failures = cons_to_prim_array(U,P,stride[0]/8);
   if (failures) return failures;
 
@@ -414,7 +417,7 @@ int Fiph(const double *P, double *F)
 
         case Reconstruct_PiecewiseConstant:
           memcpy(Pl, P0  , 8*sizeof(double));
-          memcpy(Pr, P0+8, 8*sizeof(double));
+          memcpy(Pr, P0+S, 8*sizeof(double));
           break;
 
         case Reconstruct_PLM3Velocity:
@@ -430,20 +433,19 @@ int Fiph(const double *P, double *F)
           break;
         }
 
-      double U[8];
+      double U_star[8];
       switch (lib_state.mode_riemann_solver)
 	{
 	case RiemannSolver_HLL:
-	  hll_flux (Pl, Pr, U, &F[i], 0.0);
+	  hll_flux (Pl, Pr, U_star, &F[i], 0.0);
 	  break;
 	case RiemannSolver_HLLC:
-	  hllc_flux(Pl, Pr, U, &F[i], 0.0);
+	  hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
 	  break;
 	default:
-	  hll_flux (Pl, Pr, U, &F[i], 0.0);
+	  hll_flux (Pl, Pr, U_star, &F[i], 0.0);
 	  break;
 	}
-
     }
   for (i=stride[0]-S*2; i<stride[0]; ++i)
     {
