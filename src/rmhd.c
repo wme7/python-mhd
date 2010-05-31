@@ -10,6 +10,15 @@
  * 
  * REFERENCES:
  *   
+ *
+ * USAGE: Either in static or dynamic mode:
+ *
+ *   Alive Mode: initialized by a primitive variable array from the user,
+ *     along with its dimensions. In this case internal memory is allocated for
+ *     a primitive variable array and a buffer to hold 1-d fluxes.
+ *
+ *   Dead Mode: 
+ * 
  *------------------------------------------------------------------------------
  */
 
@@ -37,7 +46,11 @@ enum QuarticSolverMode { QuarticSolver_Exact,
 			 QuarticSolver_Approx2,
 			 QuarticSolver_None };
 
-int dimension;
+enum LibraryOperationMode { LibraryOperation_Alive,
+			    LibraryOperation_Dead }
+  libopstate = LibraryOperation_Dead;
+
+int dimension=1;
 int stride[4];
 double dx,dy,dz;
 
@@ -53,11 +66,17 @@ struct LibraryState
 
   int mode_reconstruct;
   int mode_quartic_solver;
-} lib_state;
+  int mode_library_operation;
+} lib_state = { 0,0,0,
+		0.0,1.4,2.0,
+		Reconstruct_PLM4Velocity,
+		QuarticSolver_Exact };
 
 double *PrimitiveArray;
 double *FluxInterArray;
 double *lib_ux, *lib_uy, *lib_uz;
+
+
 
 int set_state(struct LibraryState state)
 {
@@ -71,6 +90,8 @@ struct LibraryState get_state()
 
 int initialize(double *P, int Nx, int Ny, int Nz)
 {
+  libopstate = LibraryOperation_Alive;
+
   stride[0] = Nx*Ny*Nz*8;
   stride[1] =    Ny*Nz*8;
   stride[2] =       Nz*8;
@@ -94,6 +115,8 @@ int initialize(double *P, int Nx, int Ny, int Nz)
 }
 int finalize()
 {
+  libopstate = LibraryOperation_Dead;
+
   free(PrimitiveArray);
   free(FluxInterArray);
 
@@ -114,8 +137,8 @@ int finalize()
 int Fiph              (const double *P, double *F);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
-int prim_to_cons_array(const double *P, double *U);
-int cons_to_prim_array(const double *U, double *P);
+int prim_to_cons_array(const double *P, double *U, int N);
+int cons_to_prim_array(const double *U, double *P, int N);
 int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am);
 
 int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr);
@@ -197,13 +220,12 @@ inline double eos_cs2(double Rho, double Pre)
 int hll_flux(double *Ul, double *Ur, double *Fl, double *Fr,
              double eml, double epl, double emr, double epr, double *fiph)
 {
+  int i;
   double am = min3(eml, emr, 0.0);
   double ap = max3(epl, epr, 0.0);
-
-  int q;
-  for (q=0; q<8; ++q)
+  for (i=0; i<8; ++i)
     {
-      fiph[q] = (ap*Fl[q] - am*Fr[q] + ap*am*(Ur[q] - Ul[q])) / (ap - am);
+      fiph[i] = (ap*Fl[i] - am*Fr[i] + ap*am*(Ur[i] - Ul[i])) / (ap - am);
     }
   return 0;
 }
@@ -288,11 +310,14 @@ int reconstruct_use_4vel(const double *P0,
 
 int dUdt_1d(const double *U, double *L)
 {
+  if (libopstate == LibraryOperation_Dead)
+    return 1;
+
   double *P = PrimitiveArray;
   double *F = FluxInterArray;
   int failures,S,i;
 
-  failures = cons_to_prim_array(U,P);
+  failures = cons_to_prim_array(U,P,stride[0]);
   if (failures) return failures;
 
   dimension = 1;
@@ -307,11 +332,14 @@ int dUdt_1d(const double *U, double *L)
 }
 int dUdt_2d(const double *U, double *L)
 {
+  if (libopstate == LibraryOperation_Dead)
+    return 1;
+
   double *P = PrimitiveArray;
   double *F = FluxInterArray;
 
   int S,i;
-  int failures = cons_to_prim_array(U,P);
+  int failures = cons_to_prim_array(U,P,stride[0]);
   if (failures) return failures;
 
   dimension = 1;
@@ -637,21 +665,37 @@ int cons_to_prim_point(const double *U, double *P)
 
   return 0;
 }
-int cons_to_prim_array(const double *U, double *P)
+int cons_to_prim_array(const double *U, double *P, int N)
 {
   int failures = 0;
   int i;
 
-  if (P != PrimitiveArray) // Replace the input array if not library's own copy
-    memcpy(P, PrimitiveArray, stride[0]*sizeof(double));
+  /* --------------------------------------------------------------------------------
+    Inspect the library state and select a strategy for inverting the conserved array
+  */
+  if (libopstate == LibraryOperation_Dead)
+    {
+      //      lib_state.cons_to_prim_use_estimate = 1;
+    }
+  else if (libopstate == LibraryOperation_Alive && P != PrimitiveArray)
+    {                            // Replace the input array if not library's own copy
+      //      lib_state.cons_to_prim_use_estimate = 0;
+      memcpy(P, PrimitiveArray, stride[0]*sizeof(double));
+    }
+  else if (libopstate == LibraryOperation_Alive && P == PrimitiveArray)
+    {
+      //      lib_state.cons_to_prim_use_estimate = 0;
+    }
+  /* ----------------------------------------------------------------------------- */
 
-  for (i=0; i<stride[0]; i+=8)
+  for (i=0; i<N; i+=8)
     {
       const double *Ui = &U[i];
       double       *Pi = &P[i];
       failures += cons_to_prim_point(Ui,Pi);
 
-      if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity)
+      if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity &&
+	  libopstate == LibraryOperation_Alive)
 	{
 	  double W = 1.0 / sqrt(1.0 - (Pi[vx]*Pi[vx] + Pi[vy]*Pi[vy] + Pi[vz]*Pi[vz]));
 	  lib_ux[i/8] = W*Pi[vx];
@@ -689,10 +733,10 @@ int prim_to_cons_point(const double *P, double *U)
   U[Bz ] = P[Bz ];
   return 0;
 }
-int prim_to_cons_array(const double *P, double *U)
+int prim_to_cons_array(const double *P, double *U, int N)
 {
   int i;
-  for (i=0; i<stride[0]; i+=8)
+  for (i=0; i<N; i+=8)
     {
       prim_to_cons_point(&P[i], &U[i]);
     }

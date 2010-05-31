@@ -68,8 +68,11 @@ _lib.dUdt_1d           .argtypes = [const_array, write_array]
 _lib.dUdt_2d           .argtypes = [const_array, write_array]
 _lib.dUdt_3d           .argtypes = [const_array, write_array]
 _lib.Fiph              .argtypes = [const_array, write_array]
-_lib.prim_to_cons_array.argtypes = [const_array, write_array]
-_lib.cons_to_prim_array.argtypes = [const_array, write_array]
+_lib.prim_to_cons_array.argtypes = [const_array, write_array, c_int]
+_lib.cons_to_prim_array.argtypes = [const_array, write_array, c_int]
+_lib.prim_to_cons_point.argtypes = [const_array, write_array]
+_lib.cons_to_prim_point.argtypes = [const_array, write_array]
+_lib.hllc_flux         .argtypes = [const_array]*4 + [write_array]*2 + [c_double]
 
 _lib.initialize        .restype = c_int
 _lib.finalize          .restype = c_int
@@ -79,6 +82,9 @@ _lib.dUdt_3d           .restype = c_int
 _lib.Fiph              .restype = c_int
 _lib.prim_to_cons_array.restype = c_int
 _lib.cons_to_prim_array.restype = c_int
+_lib.prim_to_cons_point.restype = c_int
+_lib.cons_to_prim_point.restype = c_int
+_lib.hllc_flux         .restype = c_int
 
 _lib.set_state.argtypes = [ LibraryState ]
 _lib.get_state.restype  =   LibraryState

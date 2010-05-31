@@ -1,7 +1,11 @@
 
 
+to_array = lambda S: [S['Rho'], S['Pre'],
+                      S['v'][0], S['v'][1], S['v'][2],
+                      S['B'][0], S['B'][1], S['B'][2]]
+
 class ShockTubeProblem:
-    
+
     def __init__(self, L={ }, R={ }, gamma=1.4):
 
         self._setup()
@@ -12,16 +16,16 @@ class ShockTubeProblem:
 
     def initial_model(self, P):
         
-        to_array = lambda S: [S['Rho'], S['Pre'],
-                              S['v'][0], S['v'][1], S['v'][2],
-                              S['B'][0], S['B'][1], S['B'][2]]
-
         assert len(P.shape) is 2
         Nx = P.shape[0]
 
         for i in range(8):
             P[:Nx/2,i] = to_array(self.L_state)[i]
             P[Nx/2:,i] = to_array(self.R_state)[i]
+
+    def get_states(self):
+
+        return to_array(self.L_state), to_array(self.R_state)
 
 
 class SRShockTube1(ShockTubeProblem):
@@ -74,7 +78,7 @@ class RMHDShockTube1(ShockTubeProblem):
         self.R_state = { 'Rho': 0.125, 'Pre':0.1, 'v': [0,0,0], 'B': [0.5,-1.0, 0.0] }
 
 
-class RMHDShockTube2:
+class RMHDShockTube2(ShockTubeProblem):
 
     def __init__(self, L={ }, R={ }, gamma=1.4):
 

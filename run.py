@@ -2,6 +2,45 @@
 
 
 
+def hlld_unit_test():
+
+    import rmhd
+
+    problem = RMHDShockTube1()
+    Pl, Pr = problem.get_states()
+
+    from numpy import zeros, array, linspace
+
+    F  = zeros(8)
+    U  = zeros(8)
+    P  = zeros(8)
+
+    Ul = zeros(8)
+    Ur = zeros(8)
+
+    Pl = array(Pl)
+    Pr = array(Pr)
+
+    rmhd._lib.prim_to_cons_point(Pl,Ul)
+    rmhd._lib.prim_to_cons_point(Pr,Ur)
+
+    Nx = 100
+
+    P_domain = zeros((Nx,8))
+    x = linspace(-1,1,Nx)
+    for i in range(Nx):
+
+        U = zeros(8)
+        rmhd._lib.hllc_flux(Ul,Ur,Pl,Pr,U,F,x[i])
+        print rmhd._lib.cons_to_prim_point(U,P)
+        P_domain[i,:] = P
+
+
+    from pylab import plot, show
+    plot(x,P_domain[:,0])
+    show()
+
+
 def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=False):
 
     from numpy import zeros
@@ -123,9 +162,50 @@ def compare_quartic():
     show()
 
 
+def library_dead_unit_test():
+
+    import rmhd
+    from numpy import array, zeros
+
+    problem = RMHDShockTube1()
+    P = array(problem.get_states()[0])
+    U = zeros(8)
+
+    passfail = lambda p: 'Fail' if p else 'Pass'
+
+    print "Testing prim_to_cons_point"
+    print "\tOnly option:"       , passfail(rmhd._lib.prim_to_cons_point(P,U))
+    print "Testing cons_to_prim_point..."
+    rmhd._lib.set_state(rmhd.LibraryState(cons_to_prim_use_estimate=1))
+    print "\tWith estimate:"     , passfail(rmhd._lib.cons_to_prim_point(U,P))
+    rmhd._lib.set_state(rmhd.LibraryState(cons_to_prim_use_estimate=0))
+    print "\tWith good guess:"   , passfail(rmhd._lib.cons_to_prim_point(U,P))
+    print "\tWith bad guess:"    , passfail(rmhd._lib.cons_to_prim_point(U,P*0.1))
+    print "\tWith aweful guess:" , passfail(rmhd._lib.cons_to_prim_point(U,P*0.0))
+
+    print "Testing prim_to_cons_array..."
+    Nx = 100
+    P_all = zeros((Nx,8))
+    U_all = zeros((Nx,8))
+    for i in range(Nx):
+        P_all[i,:] = P
+
+    print "Testing prim_to_cons_array"
+    print "\tOnly option:"       , passfail(rmhd._lib.prim_to_cons_array(P_all,U_all,Nx))
+    print "Testing cons_to_prim_array..."
+    rmhd._lib.set_state(rmhd.LibraryState(cons_to_prim_use_estimate=1))
+    print "\tWith estimate:"     , passfail(rmhd._lib.cons_to_prim_array(U_all,P_all,Nx))
+    rmhd._lib.set_state(rmhd.LibraryState(cons_to_prim_use_estimate=0))
+    print "\tWith good guess:"   , passfail(rmhd._lib.cons_to_prim_array(U_all,P_all,Nx))
+    print "\tWith bad guess:"    , passfail(rmhd._lib.cons_to_prim_array(U_all,P_all*0.1,Nx))
+    print "\tWith aweful guess:" , passfail(rmhd._lib.cons_to_prim_array(U_all,P_all*0.0,Nx))
+
+
 if __name__ == "__main__":
 
     from rmhd.testbench import *
     #sr_shocktube()
     #compare_reconstruct()
-    compare_quartic()
+    #compare_quartic()
+    #hlld_unit_test()
+    library_dead_unit_test()
