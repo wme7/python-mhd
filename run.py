@@ -125,16 +125,25 @@ def run_2d_problem(lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, ver
         if e1 or e2:
             print "Run crashed! Sorry...", e1, e2
             break
+
+        """
+        e1 = lib.dUdt_2d(U,L)
+        if e1:
+            print "Run crashed! Sorry...", e1
+            break
+        """
+
         U += dt*L
         t += dt
         n_cycle += 1
 
-        for i in range(4): # Boundary conditions
-            U[   i  ,:] = U[   4,:]
-            U[Nx-i-1,:] = U[Nx-5,:]
+        Ng = 4
+        for i in range(Ng): # Boundary conditions
+            U[   i  ,:] = U[   Ng  ,:]
+            U[Nx-i-1,:] = U[Nx-Ng-1,:]
 
-            U[:,   i  ] = U[:,   4]
-            U[:,Ny-i-1] = U[:,Ny-5]
+            U[:,   i  ] = U[:,   Ng  ]
+            U[:,Ny-i-1] = U[:,Ny-Ng-1]
 
         ttltime += time()-start
 
@@ -287,10 +296,9 @@ def test_2d():
     from numpy import array, zeros
     from pylab import show, imshow, colorbar
 
-    state = LibraryState(plm_theta=2.0, mode_reconstruct=2, mode_riemann_solver=1)
-    problem = SRShockTube1()#RMHDCylindricalA(pre=0.01)
-    problem.orientation = 'y'
-    P = run_2d_problem(_lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, verbose=True)
+    state = LibraryState(plm_theta=2.0, mode_reconstruct=0, mode_riemann_solver=1)
+    problem = RMHDCylindricalA(pre=1.0)
+    P = run_2d_problem(_lib, state, problem, Nx=128, Ny=128, CFL=0.4, tfinal=0.2)
     visual.four_pane_2d(P, x=(-1,1))
     show()
 

@@ -405,6 +405,7 @@ int dUdt_3d(const double *U, double *L)
 int Fiph(const double *P, double *F)
 {
   const int S = stride[dimension];
+  hllc_set_dimension(dimension);
 
   int i;
   for (i=0; i<S; ++i)
@@ -447,7 +448,6 @@ int Fiph(const double *P, double *F)
 	  hll_flux (Pl, Pr, U_star, &F[i], 0.0);
 	  break;
 	case RiemannSolver_HLLC:
-	  hllc_set_dimension(dimension);
 	  hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
 	  break;
 	default:
@@ -473,7 +473,7 @@ int constraint_transport_2d(double *Fx, double *Fy)
       double *F = &Fx[i];
       double *G = &Fy[i];
       FxBy[i/8] = (2*F[By]+F[By+sy]+F[By-sy]-G[Bx]-G[Bx+sx]-G[Bx-sy]-G[Bx+sx-sy])*0.125;
-      FyBx[i/8] = (2*G[Bx]+G[By+sx]+G[By-sx]-F[By]-F[Bx+sy]-F[Bx-sx]-F[By-sx+sy])*0.125;
+      FyBx[i/8] = (2*G[Bx]+G[Bx+sx]+G[Bx-sx]-F[By]-F[By+sy]-F[By-sx]-F[By-sx+sy])*0.125;
     }
   for (i=0; i<stride[0]; i+=8)
     {
