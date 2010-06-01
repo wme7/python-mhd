@@ -26,10 +26,13 @@
 enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz }; // Conserved
 enum { rho, pre, vx, vy, vz };             // Primitive
 
+static int dimension = 1;
+
 int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
 
+int hllc_set_dimension(int d) { dimension = d; }
 int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s)
 {
   int i;
@@ -37,6 +40,31 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
   double Ul[8], Ur[8];
   double Pl[8], Pr[8];
   double Fl[8], Fr[8];
+
+  int B1,B2,B3;
+  int S1,S2,S3;
+  int v1,v2,v3;
+
+  switch (dimension)
+    {
+    case 1:
+      B1=Bx; B2=By; B3=Bz;
+      S1=Sx; S2=Sy; S3=Sz;
+      v1=vx; v2=vy; v3=vz;
+      break;
+
+    case 2:
+      B1=By; B2=Bz; B3=Bx;
+      S1=Sy; S2=Sz; S3=Sx;
+      v1=vy; v2=vz; v3=vx;
+      break;
+
+    case 3:
+      B1=Bz; B2=Bx; B3=By;
+      S1=Sz; S2=Sx; S3=Sy;
+      v1=vz; v2=vx; v3=vy;
+      break;
+    }
 
   memcpy(Pl,pl,8*sizeof(double));
   memcpy(Pr,pr,8*sizeof(double));
@@ -53,8 +81,8 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
   Ul[tau] += Ul[ddd];  Fl[tau] += Fl[ddd]; // Change in convention of total energy
   Ur[tau] += Ur[ddd];  Fr[tau] += Fr[ddd];
 
-  Ul[Bx] = Ur[Bx] = 0.5*(Ul[Bx] + Ur[Bx]); // Must have no normal jump in B
-  Fl[Bx] = Fr[Bx] = 0.5*(Fl[Bx] + Fr[Bx]);
+  Ul[B1] = Ur[B1] = 0.5*(Ul[B1] + Ur[B1]); // Must have no normal jump in B
+  Fl[B1] = Fr[B1] = 0.5*(Fl[B1] + Fr[B1]);
 
   double F_hll[8], U_hll[8];
   for (i=0; i<8; ++i)
@@ -64,80 +92,80 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
     }
 
   double Ul_[8], Ur_[8], P_[8], lc; // The star states
-  if (fabs(U_hll[Bx]) > SMALL_BX)
+  if (fabs(U_hll[B1]) > SMALL_BX)
     {
-      const double B_dot_FB = U_hll[By]*F_hll[By] + U_hll[Bz]*F_hll[Bz];
+      const double B_dot_FB = U_hll[B2]*F_hll[B2] + U_hll[B3]*F_hll[B3];
       const double a =  F_hll[tau] - B_dot_FB; // eqns (42)
-      const double b = -F_hll[Sx ] - U_hll[tau] +
-	(U_hll[By]*U_hll[By] + U_hll[Bz]*U_hll[Bz]) +
-	(F_hll[By]*F_hll[By] + F_hll[Bz]*F_hll[Bz]);
-      const double c =  U_hll[Sx ] - B_dot_FB;
+      const double b = -F_hll[S1 ] - U_hll[tau] +
+	(U_hll[B2]*U_hll[B2] + U_hll[B3]*U_hll[B3]) +
+	(F_hll[B2]*F_hll[B2] + F_hll[B3]*F_hll[B3]);
+      const double c =  U_hll[S1 ] - B_dot_FB;
 
-      P_[vx] = lc = (-b - sqrt(b*b - 4*a*c)) / (2*a); // take root with the minus sign
-      P_[vy] = (U_hll[By]*P_[vx] - F_hll[By]) / U_hll[Bx]; // eqn (38)
-      P_[vz] = (U_hll[Bz]*P_[vx] - F_hll[Bz]) / U_hll[Bx];
+      P_[v1] = lc = (-b - sqrt(b*b - 4*a*c)) / (2*a); // take root with the minus sign
+      P_[v2] = (U_hll[B2]*P_[v1] - F_hll[B2]) / U_hll[B1]; // eqn (38)
+      P_[v3] = (U_hll[B3]*P_[v1] - F_hll[B3]) / U_hll[B1];
 
-      P_[Bx] = U_hll[Bx];
-      P_[By] = U_hll[By];
-      P_[Bz] = U_hll[Bz];
+      P_[B1] = U_hll[B1];
+      P_[B2] = U_hll[B2];
+      P_[B3] = U_hll[B3];
 
-      const double v_dotB_ = P_[vx]*P_[Bx] + P_[vy]*P_[By] + P_[vz]*P_[Bz];
-      const double v_dotv_ = P_[vx]*P_[vx] + P_[vy]*P_[vy] + P_[vz]*P_[vz];
+      const double v_dotB_ = P_[v1]*P_[B1] + P_[v2]*P_[B2] + P_[v3]*P_[B3];
+      const double v_dotv_ = P_[v1]*P_[v1] + P_[v2]*P_[v2] + P_[v3]*P_[v3];
       const double gm2_ = 1.0 / (1.0 - v_dotv_);
 
-      P_[pre] = F_hll[Sx] + P_[Bx]*P_[Bx]/gm2_ - (F_hll[tau] - P_[Bx]*v_dotB_)*P_[vx];
+      P_[pre] = F_hll[S1] + P_[B1]*P_[B1]/gm2_ - (F_hll[tau] - P_[B1]*v_dotB_)*P_[v1];
 
-      Ul_[ddd] = (am - Pl[vx]) / (am - P_[vx]) * Ul[ddd];
-      Ur_[ddd] = (ap - Pr[vx]) / (ap - P_[vx]) * Ur[ddd];
+      Ul_[ddd] = (am - Pl[v1]) / (am - P_[v1]) * Ul[ddd];
+      Ur_[ddd] = (ap - Pr[v1]) / (ap - P_[v1]) * Ur[ddd];
 
-      Ul_[tau] = (am*Ul[tau] - Ul[Sx] + P_[pre]*P_[vx] - v_dotB_*P_[Bx]) / (am - P_[vx]);
-      Ur_[tau] = (ap*Ur[tau] - Ur[Sx] + P_[pre]*P_[vx] - v_dotB_*P_[Bx]) / (ap - P_[vx]);
+      Ul_[tau] = (am*Ul[tau] - Ul[S1] + P_[pre]*P_[v1] - v_dotB_*P_[B1]) / (am - P_[v1]);
+      Ur_[tau] = (ap*Ur[tau] - Ur[S1] + P_[pre]*P_[v1] - v_dotB_*P_[B1]) / (ap - P_[v1]);
 
-      Ul_[Sy ] = (-P_[Bx]*(P_[By]/gm2_ + v_dotB_*P_[vy]) + am*Ul[Sy] - Fl[Sy]) / (am - P_[vx]);
-      Ur_[Sy ] = (-P_[Bx]*(P_[By]/gm2_ + v_dotB_*P_[vy]) + ap*Ur[Sy] - Fr[Sy]) / (ap - P_[vx]);
+      Ul_[S2 ] = (-P_[B1]*(P_[B2]/gm2_ + v_dotB_*P_[v2]) + am*Ul[S2] - Fl[S2]) / (am - P_[v1]);
+      Ur_[S2 ] = (-P_[B1]*(P_[B2]/gm2_ + v_dotB_*P_[v2]) + ap*Ur[S2] - Fr[S2]) / (ap - P_[v1]);
 
-      Ul_[Sz ] = (-P_[Bx]*(P_[Bz]/gm2_ + v_dotB_*P_[vz]) + am*Ul[Sz] - Fl[Sz]) / (am - P_[vx]);
-      Ur_[Sz ] = (-P_[Bx]*(P_[Bz]/gm2_ + v_dotB_*P_[vz]) + ap*Ur[Sz] - Fr[Sz]) / (ap - P_[vx]);
+      Ul_[S3 ] = (-P_[B1]*(P_[B3]/gm2_ + v_dotB_*P_[v3]) + am*Ul[S3] - Fl[S3]) / (am - P_[v1]);
+      Ur_[S3 ] = (-P_[B1]*(P_[B3]/gm2_ + v_dotB_*P_[v3]) + ap*Ur[S3] - Fr[S3]) / (ap - P_[v1]);
 
-      Ul_[Sx ] = (Ul_[tau] + P_[pre])*P_[vx] - v_dotB_*P_[Bx];
-      Ur_[Sx ] = (Ur_[tau] + P_[pre])*P_[vx] - v_dotB_*P_[Bx];
+      Ul_[S1 ] = (Ul_[tau] + P_[pre])*P_[v1] - v_dotB_*P_[B1];
+      Ur_[S1 ] = (Ur_[tau] + P_[pre])*P_[v1] - v_dotB_*P_[B1];
 
-      Ul_[Bx] = Ur_[Bx] = P_[Bx];
-      Ul_[By] = Ur_[By] = P_[By];
-      Ul_[Bz] = Ur_[Bz] = P_[Bz];
+      Ul_[B1] = Ur_[B1] = P_[B1];
+      Ul_[B2] = Ur_[B2] = P_[B2];
+      Ul_[B3] = Ur_[B3] = P_[B3];
     }
   else
     {
       const double a =  F_hll[tau];
-      const double b = -F_hll[Sx ] - U_hll[tau];
-      const double c =  U_hll[Sx ];
+      const double b = -F_hll[S1 ] - U_hll[tau];
+      const double c =  U_hll[S1 ];
 
-      const double vx_ = lc = (-b - sqrt(b*b - 4*a*c)) / (2*a);
-      const double p_  = -F_hll[tau]*vx_ + F_hll[Sx];
+      const double v1_ = lc = (-b - sqrt(b*b - 4*a*c)) / (2*a);
+      const double p_  = -F_hll[tau]*v1_ + F_hll[S1];
 
-      Ul_[ddd] = (am - Pl[vx]) / (am - vx_) * Ul[ddd];
-      Ur_[ddd] = (ap - Pr[vx]) / (ap - vx_) * Ur[ddd];
+      Ul_[ddd] = (am - Pl[v1]) / (am - v1_) * Ul[ddd];
+      Ur_[ddd] = (ap - Pr[v1]) / (ap - v1_) * Ur[ddd];
 
-      Ul_[tau] = (am*Ul[tau] - Ul[Sx] + p_*vx_) / (am - vx_);
-      Ur_[tau] = (ap*Ur[tau] - Ur[Sx] + p_*vx_) / (ap - vx_);
+      Ul_[tau] = (am*Ul[tau] - Ul[S1] + p_*v1_) / (am - v1_);
+      Ur_[tau] = (ap*Ur[tau] - Ur[S1] + p_*v1_) / (ap - v1_);
 
-      Ul_[Sx ] = (Ul_[tau] + p_)*vx_;
-      Ur_[Sx ] = (Ur_[tau] + p_)*vx_;
+      Ul_[S1 ] = (Ul_[tau] + p_)*v1_;
+      Ur_[S1 ] = (Ur_[tau] + p_)*v1_;
 
-      Ul_[Sy ] = (am - Pl[vx]) / (am - vx_) * Ul[Sy];
-      Ur_[Sy ] = (ap - Pr[vx]) / (ap - vx_) * Ur[Sy];
+      Ul_[S2 ] = (am - Pl[v1]) / (am - v1_) * Ul[S2];
+      Ur_[S2 ] = (ap - Pr[v1]) / (ap - v1_) * Ur[S2];
 
-      Ul_[Sz ] = (am - Pl[vx]) / (am - vx_) * Ul[Sz];
-      Ur_[Sz ] = (ap - Pr[vx]) / (ap - vx_) * Ur[Sz];
+      Ul_[S3 ] = (am - Pl[v1]) / (am - v1_) * Ul[S3];
+      Ur_[S3 ] = (ap - Pr[v1]) / (ap - v1_) * Ur[S3];
 
-      Ul_[Bx ] = U_hll[Bx];
-      Ur_[Bx ] = U_hll[Bx];
+      Ul_[B1 ] = U_hll[B1];
+      Ur_[B1 ] = U_hll[B1];
 
-      Ul_[By ] = (am - Pl[vx]) / (am - vx_) * Ul[By];
-      Ur_[By ] = (ap - Pr[vx]) / (ap - vx_) * Ur[By];
+      Ul_[B2 ] = (am - Pl[v1]) / (am - v1_) * Ul[B2];
+      Ur_[B2 ] = (ap - Pr[v1]) / (ap - v1_) * Ur[B2];
 
-      Ul_[Bz ] = (am - Pl[vx]) / (am - vx_) * Ul[Bz];
-      Ur_[Bz ] = (ap - Pr[vx]) / (ap - vx_) * Ur[Bz];
+      Ul_[B3 ] = (am - Pl[v1]) / (am - v1_) * Ul[B3];
+      Ur_[B3 ] = (ap - Pr[v1]) / (ap - v1_) * Ur[B3];
     }
 
   if      (         s<=am ) for (i=0; i<8; ++i) U[i] = Ul [i];

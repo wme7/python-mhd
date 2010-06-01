@@ -1,4 +1,45 @@
 
+def four_pane_2d(P, extent=[-1,1,-1,1], **kwargs):
+
+    from pylab import subplot, title, colorbar, cm, imshow, quiver
+    from numpy import sqrt, linspace, meshgrid
+
+    rho, pre   = P[:,:,0], P[:,:,1]
+    vx, vy, vz = P[:,:,2], P[:,:,3], P[:,:,4]
+    Bx, By, Bz = P[:,:,5], P[:,:,6], P[:,:,7]
+
+    B2 = Bx**2 + By**2 + Bz**2
+    v2 = vx**2 + vy**2 + vz**2
+    W2 = 1.0 / (1.0 - v2)
+
+    subplot(2,2,1)
+    imshow(rho.T, extent=extent, cmap=cm.hot)
+    colorbar()
+    title("Density")
+
+    subplot(2,2,2)
+    imshow(pre.T, extent=extent, cmap=cm.hot)
+    colorbar()
+    title("Pressure")
+
+    subplot(2,2,3)
+    imshow(B2.T, extent=extent, cmap=cm.hot)
+    colorbar()
+    title("Magnetic Pressure")
+
+    subplot(2,2,4)
+    imshow(sqrt(W2).T, extent=extent, cmap=cm.hot)
+    colorbar()
+    title("Lorentz Factor")
+
+    N = 10
+    X,Y = meshgrid(linspace(extent[0],extent[1],Bx.shape[0]),
+                   linspace(extent[2],extent[3],Bx.shape[1]))
+    quiver(X[::N,::N], Y[::N,::N], Bx[::N,::N], By[::N,::N], color='b',
+           linewidths=(0.2,), edgecolors=('k'), headaxislength=10)
+
+
+
 def shocktube(P, x=(-1,1), **kwargs):
 
     from pylab import sqrt, linspace, subplot, plot, text, xlabel, figure, show

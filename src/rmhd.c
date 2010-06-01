@@ -54,6 +54,7 @@ enum LibraryOperationMode { LibraryOperation_Alive,
   libopstate = LibraryOperation_Dead;
 
 int dimension=1;
+int num_dims;
 int stride[4];
 double dx,dy,dz;
 
@@ -77,9 +78,10 @@ struct LibraryState
 		QuarticSolver_Exact };
 
 double *PrimitiveArray;
-double *FluxInterArray;
+double *FluxInterArray_x;
+double *FluxInterArray_y;
+double *FluxInterArray_z;
 double *lib_ux, *lib_uy, *lib_uz;
-
 
 int set_state(struct LibraryState state)
 {
@@ -101,33 +103,40 @@ int initialize(double *P, int Nx, int Ny, int Nz)
   stride[3] =          8;
   dimension = 1;
 
+  num_dims = 1;
+  if (Ny>1) num_dims++;
+  if (Nz>1) num_dims++;
+
   dx = 1.0 / Nx;
   dy = 1.0 / Ny;
   dz = 1.0 / Nz;
 
   PrimitiveArray = (double*) malloc(stride[0]*sizeof(double));
-  FluxInterArray = (double*) malloc(stride[0]*sizeof(double));
   memcpy(PrimitiveArray, P, stride[0]*sizeof(double));
+
+  FluxInterArray_x = (double*) malloc(stride[0]*sizeof(double));
+  FluxInterArray_y = (double*) malloc(stride[0]*sizeof(double));
+  FluxInterArray_z = (double*) malloc(stride[0]*sizeof(double));
 
   lib_ux = (double*) malloc(stride[0]/8*sizeof(double));
   lib_uy = (double*) malloc(stride[0]/8*sizeof(double));
   lib_uz = (double*) malloc(stride[0]/8*sizeof(double));
 
-  //  printf("Initialized RMHD library.\n");
   return 0;
 }
 int finalize()
 {
   libopstate = LibraryOperation_Dead;
-
   free(PrimitiveArray);
-  free(FluxInterArray);
+
+  free(FluxInterArray_x);
+  free(FluxInterArray_y);
+  free(FluxInterArray_z);
 
   free(lib_ux);
   free(lib_uy);
   free(lib_uz);
 
-  //  printf("Finalized RMHD library.\n");
   return 0;
 }
 
@@ -137,6 +146,7 @@ int finalize()
  * Function prototypes
  *
  */
+
 int Fiph              (const double *P, double *F);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
@@ -149,6 +159,8 @@ int reconstruct_use_4vel(const double *P0,
 			 const double *ux, const double *uy, const double *uz,
 			 double *Pl, double *Pr);
 
+int constraint_transport_2d(double *Fx, double *Fy);
+
 int new_QuarticEquation(double d4, double d3, double d2, double d1, double d0);
 int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
                            int *nr12, int *nr34);
@@ -159,6 +171,7 @@ int report_cons_to_prim_failure(const double *U, const double *P);
 int report_nonphysical_failure (const double *U, const double *P);
 int hll_flux (const double *pl, const double *pr, double *U, double *F, double s);
 int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s);
+int hllc_set_dimension(int d);
 
 /*------------------------------------------------------------------------------
  *
@@ -339,14 +352,13 @@ int reconstruct_use_4vel(const double *P0,
 
   return 0;
 }
-
 int dUdt_1d(const double *U, double *L)
 {
   if (libopstate == LibraryOperation_Dead)
     return 1;
 
   double *P = PrimitiveArray;
-  double *F = FluxInterArray;
+  double *F = FluxInterArray_x;
   int failures,S,i;
 
   failures = cons_to_prim_array(U,P,stride[0]/8);
@@ -358,7 +370,7 @@ int dUdt_1d(const double *U, double *L)
   S = stride[dimension];
   for (i=S; i<stride[0]; ++i)
     {
-      L[i] = -(F[i] - F[i-S]) / dx;
+      L[i] = -(F[i] - F[i-S])/dx;
     }
   return failures;
 }
@@ -368,32 +380,27 @@ int dUdt_2d(const double *U, double *L)
     return 1;
 
   double *P = PrimitiveArray;
-  double *F = FluxInterArray;
-  int S,i;
+  double *F = FluxInterArray_x;
+  double *G = FluxInterArray_y;
+  int i,sx=stride[1], sy=stride[2];
 
   int failures = cons_to_prim_array(U,P,stride[0]/8);
   if (failures) return failures;
 
-  dimension = 1;
-  Fiph(P,F);
-  S = stride[dimension];
-  for (i=S; i<stride[0]; ++i)
-    {
-      L[i] = -(F[i] - F[i-S]) / dx;
-    }
+  dimension = 1;  Fiph(P,F);
+  dimension = 2;  Fiph(P,G);
 
-  dimension = 2;
-  Fiph(P,F);
-  S = stride[dimension];
-  for (i=S; i<stride[0]; ++i)
+  constraint_transport_2d(F,G);
+
+  for (i=sx; i<stride[0]; ++i)
     {
-      L[i] -= (F[i] - F[i-S]) / dy;
+      L[i] = -(F[i] - F[i-sx])/dx - (G[i] - G[i-sy])/dy;
     }
   return 0;
 }
 int dUdt_3d(const double *U, double *L)
 {
-
+  return 0;
 }
 int Fiph(const double *P, double *F)
 {
@@ -440,6 +447,7 @@ int Fiph(const double *P, double *F)
 	  hll_flux (Pl, Pr, U_star, &F[i], 0.0);
 	  break;
 	case RiemannSolver_HLLC:
+	  hllc_set_dimension(dimension);
 	  hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
 	  break;
 	default:
@@ -452,6 +460,29 @@ int Fiph(const double *P, double *F)
       F[i] = 0;
     }
   return 0;
+}
+int constraint_transport_2d(double *Fx, double *Fy)
+{
+  double *FxBy = (double*) malloc(stride[0]/8*sizeof(double));
+  double *FyBx = (double*) malloc(stride[0]/8*sizeof(double));
+
+  int i;
+  const int sx=stride[1],sy=stride[2];
+  for (i=sx; i<stride[0]-sx; i+=8)
+    {
+      double *F = &Fx[i];
+      double *G = &Fy[i];
+      FxBy[i/8] = (2*F[By]+F[By+sy]+F[By-sy]-G[Bx]-G[Bx+sx]-G[Bx-sy]-G[Bx+sx-sy])*0.125;
+      FyBx[i/8] = (2*G[Bx]+G[By+sx]+G[By-sx]-F[By]-F[Bx+sy]-F[Bx-sx]-F[By-sx+sy])*0.125;
+    }
+  for (i=0; i<stride[0]; i+=8)
+    {
+      Fx[i+Bx] = 0.0;       Fx[i+By] = FxBy[i/8];
+      Fy[i+Bx] = FyBx[i/8]; Fy[i+By] = 0.0;
+    }
+
+  free(FxBy);
+  free(FyBx);
 }
 
 int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am)
@@ -535,7 +566,6 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
   const double A2 =  6*K*V2 + L*(1-V2) +   b0*b0 - bi*bi;
   const double A1 = -4*K*V3 - L*vi*2   - 2*b0*bi;
   const double A0 =    K*V4 + L*V2     +   bi*bi;
-
 
 
   new_QuarticEquation(A4,A3,A2,A1,A0);
@@ -713,16 +743,15 @@ int cons_to_prim_array(const double *U, double *P, int N)
   */
   if (libopstate == LibraryOperation_Dead)
     {
-      //      lib_state.cons_to_prim_use_estimate = 1;
+
     }
   else if (libopstate == LibraryOperation_Alive && P != PrimitiveArray)
     {                            // Replace the input array if not library's own copy
-      //      lib_state.cons_to_prim_use_estimate = 0;
       memcpy(P, PrimitiveArray, stride[0]*sizeof(double));
     }
   else if (libopstate == LibraryOperation_Alive && P == PrimitiveArray)
     {
-      //      lib_state.cons_to_prim_use_estimate = 0;
+
     }
   /* ----------------------------------------------------------------------------- */
 

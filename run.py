@@ -124,8 +124,7 @@ def run_2d_problem(lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, ver
 
         if e1 or e2:
             print "Run crashed! Sorry...", e1, e2
-            #break
-
+            break
         U += dt*L
         t += dt
         n_cycle += 1
@@ -284,15 +283,15 @@ def library_dead_unit_test():
 
 def test_2d():
 
-    from rmhd import _lib, LibraryState
+    from rmhd import _lib, LibraryState, visual
     from numpy import array, zeros
     from pylab import show, imshow, colorbar
 
-    state = LibraryState(plm_theta=2.0, mode_reconstruct=0)
-    problem = RMHDCylindricalA()
-    P = run_2d_problem(_lib, state, problem, Nx=128, Ny=128, CFL=0.4, tfinal=0.2, verbose=True)
-    imshow(P[:,:,1])
-    colorbar()
+    state = LibraryState(plm_theta=2.0, mode_reconstruct=2, mode_riemann_solver=1)
+    problem = SRShockTube1()#RMHDCylindricalA(pre=0.01)
+    problem.orientation = 'y'
+    P = run_2d_problem(_lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, verbose=True)
+    visual.four_pane_2d(P, x=(-1,1))
     show()
 
 

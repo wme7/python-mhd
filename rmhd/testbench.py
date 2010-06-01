@@ -33,14 +33,13 @@ class CylindricalProblem:
 
 class ShockTubeProblem:
 
-    def __init__(self, L={ }, R={ }, gamma=1.4, orientation='x'):
+    def __init__(self, L={ }, R={ }, gamma=1.4):
 
         self._setup()
 
         self.L_state.update(L)
         self.R_state.update(R)
         self.adiabatic_gamma = gamma
-        self.orientation = orientation
 
     def initial_model(self, P):
         
@@ -55,15 +54,21 @@ class ShockTubeProblem:
 
             Nx, Ny = P.shape[0:2]
 
-            if self.orientation == 'x':
+            try:
+                if self.orientation == 'x':
+                    for i in range(8):
+                        P[:Nx/2,:,i] = to_array(self.L_state)[i]
+                        P[Nx/2:,:,i] = to_array(self.R_state)[i]
+
+                elif self.orientation == 'y':
+                    for i in range(8):
+                        P[:,:Ny/2,i] = to_array(self.L_state)[i]
+                        P[:,Ny/2:,i] = to_array(self.R_state)[i]
+
+            except AttributeError:
                 for i in range(8):
                     P[:Nx/2,:,i] = to_array(self.L_state)[i]
                     P[Nx/2:,:,i] = to_array(self.R_state)[i]
-
-            elif self.orientation == 'y':
-                for i in range(8):
-                    P[:,:Ny/2,i] = to_array(self.L_state)[i]
-                    P[:,Ny/2:,i] = to_array(self.R_state)[i]
 
         else: raise Exception
 
@@ -75,14 +80,15 @@ class ShockTubeProblem:
 
 class RMHDCylindricalA(CylindricalProblem):
 
-    def __init__(self, I={ }, O={ }, gamma=1.4):
+    def __init__(self, I={ }, O={ }, pre=1.0, gamma=1.4):
 
+        self.pre = pre
         CylindricalProblem.__init__(self, I=I, O=O, gamma=gamma)
 
     def _setup(self):
 
-        self.I_state = { 'Rho':1.0, 'Pre':1.00, 'v': [0,0,0], 'B': [0,0,0] }
-        self.O_state = { 'Rho':1.0, 'Pre':0.01, 'v': [0,0,0], 'B': [0,0,0] }
+        self.I_state = { 'Rho':1.0, 'Pre':self.pre, 'v': [0,0,0], 'B': [4,0,0] }
+        self.O_state = { 'Rho':1.0, 'Pre':    0.01, 'v': [0,0,0], 'B': [4,0,0] }
 
 
 
