@@ -13,7 +13,8 @@ def four_pane_2dA(P, extent=[0,1,0,1], **kwargs):
     v2 = vx**2 + vy**2 + vz**2
     W  = 1.0 / sqrt(1.0 - v2)
 
-    imargs = {'extent':extent, 'cmap':cm.hot, 'interpolation':'nearest'}
+    imargs = {'extent':extent, 'cmap':cm.hot, 'interpolation':'bilinear'}
+    imargs.update(kwargs)
 
     tr = lambda x: flipud(x.T)
 
@@ -65,7 +66,8 @@ def four_pane_2dB(P, extent=[0,1,0,1], **kwargs):
     v2 = vx**2 + vy**2 + vz**2
     W2 = 1.0 / (1.0 - v2)
 
-    imargs = {'extent':extent, 'cmap':cm.hot, 'interpolation':'nearest'}
+    imargs = {'extent':extent, 'cmap':cm.hot, 'interpolation':'bilinear'}
+    imargs.update(kwargs)
 
     subplot(2,2,1)
     imshow(Bx.T)

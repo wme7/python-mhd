@@ -56,11 +56,10 @@ def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=Fal
 
 def run_2d_problem(lib, state, problem, RK_order=2, Nx=128, Ny=128, CFL=0.5, tfinal=0.2):
 
-    from numpy import zeros
+    from numpy import zeros, zeros_like
 
     P = zeros((Nx,Ny,8))
     U = zeros((Nx,Ny,8))
-    L = zeros((Nx,Ny,8))
 
     state.adiabatic_gamma = 1.4
     problem.initial_model(P)
@@ -69,19 +68,19 @@ def run_2d_problem(lib, state, problem, RK_order=2, Nx=128, Ny=128, CFL=0.5, tfi
     lib.initialize(P,Nx,Ny,1)
     lib.prim_to_cons_array(P,U,Nx*Ny)
 
-    dx  = 1.0 / Nx
-    dy  = 1.0 / Ny
+    dx = 1.0 / (Nx-4);
+    dy = 1.0 / (Ny-4);
+
     t   = 0.0
-    dt  = CFL * min([dx,dy])
+    dt  = 1e-8
 
     from time import time
 
     ttltime = 0.0
     n_cycle = 0
 
-
     def dUdt(U):
-
+        L = zeros_like(U)
         Ng = 2
         for i in range(Ng): # Boundary conditions
             U[   i  ,:] = U[   Ng  ,:]
@@ -90,8 +89,8 @@ def run_2d_problem(lib, state, problem, RK_order=2, Nx=128, Ny=128, CFL=0.5, tfi
             U[:,   i  ] = U[:,   Ng  ]
             U[:,Ny-i-1] = U[:,Ny-Ng-1]
 
-        e = lib.dUdt_2d(U,L)
-        if e: print "Run crashed with %d failures, sorry..." % e
+        failures = lib.dUdt_2d(U,L)
+        if failures: print "dUdt got %d failures" % failures
         return L
 
 
@@ -100,17 +99,24 @@ def run_2d_problem(lib, state, problem, RK_order=2, Nx=128, Ny=128, CFL=0.5, tfi
         n_cycle += 1
         start = time()
 
+        if RK_order is 1:
+            U += dt*dUdt(U)
+
         if RK_order is 2:
-            U += dt*dUdt(U + 0.5*dt*dUdt(U))
+            L1 = dUdt(U);
+            U += dt*dUdt(U + 0.5*dt*L1);
 
         elif RK_order is 3:
+
             U1 =      U +                  dt * dUdt(U )
             U1 = 3./4*U + 1./4*U1 + 1./4 * dt * dUdt(U1)
             U  = 1./3*U + 2./3*U1 + 2./3 * dt * dUdt(U1)
 
         t += dt
         ttltime += time()-start
-        print "t =", t
+        print "t = %8.6f, dt = %5.4e" % (t,dt)
+
+        dt = CFL * min([dx,dy])
 
 
     lib.cons_to_prim_array(U,P,Nx*Ny)
@@ -298,14 +304,35 @@ def library_dead_unit_test():
     print "\tWith aweful guess:" , passfail(rmhd._lib.cons_to_prim_array(U_all,P_all*0.0,Nx))
 
 
+def divergence_2d_cross_stencil(f,g):
+
+    from numpy import zeros
+
+    Nx = f.shape[0]
+    Ny = f.shape[1]
+
+    dx = 1.0/Nx
+    dy = 1.0/Ny
+    div = zeros((Nx,Ny))
+
+    for i in range(1,Nx-1):
+        for j in range(1,Ny-1):
+            div[i,j] = (f[i+1,j]+f[i+1,j+1]-f[i,j]-f[i,j+1])/(2*dx) + (g[i,j+1]+g[i+1,j+1]-g[i,j]-g[i+1,j])/(2*dy)
+
+    return div
+
+
 def test_2d():
 
     from rmhd import _lib, LibraryState, visual
-    from pylab import show
+    from pylab import show, imshow, colorbar
 
-    state = LibraryState(plm_theta=1.0, mode_reconstruct=2, mode_riemann_solver=1)
+    state = LibraryState(plm_theta=2.0, mode_reconstruct=1, mode_riemann_solver=0,
+                         mode_quartic_solver=0)
+
     problem = RMHDCylindricalA(pre=100.0)
-    P = run_2d_problem(_lib, state, problem, RK_order=3, Nx=128, Ny=128, CFL=0.4, tfinal=0.2)
+    P = run_2d_problem(_lib, state, problem, RK_order=3, Nx=260, Ny=260, CFL=0.6, tfinal=0.8)
+
     visual.four_pane_2dA(P, extent=[0,1,0,1])
     show()
 

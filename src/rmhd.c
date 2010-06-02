@@ -11,14 +11,18 @@
  * REFERENCES:
  *   
  *
- * USAGE: Either in static or dynamic mode:
+ * USAGE: Either in Alive or Dead mode:
  *
  *   Alive Mode: initialized by a primitive variable array from the user,
  *     along with its dimensions. In this case internal memory is allocated for
- *     a primitive variable array and a buffer to hold 1-d fluxes.
+ *     a primitive variable array and a buffer to hold 1-d fluxes. Purpose is
+ *     for external use of the dUdt_Nd functions
  *
- *   Dead Mode: 
- * 
+ *   Dead Mode: no initialization is necessary, no internal memory is used.
+ *     cons_to_prim runs on estimate by default, may be set to use output
+ *     primitive state as the guess. Purpose is for unit testing by external
+ *     code.
+ *
  *------------------------------------------------------------------------------
  */
 
@@ -54,7 +58,6 @@ enum LibraryOperationMode { LibraryOperation_Alive,
   libopstate = LibraryOperation_Dead;
 
 int dimension=1;
-int num_dims;
 int stride[4];
 double dx,dy,dz;
 
@@ -103,13 +106,9 @@ int initialize(double *P, int Nx, int Ny, int Nz)
   stride[3] =          8;
   dimension = 1;
 
-  num_dims = 1;
-  if (Ny>1) num_dims++;
-  if (Nz>1) num_dims++;
-
-  dx = 1.0 / Nx;
-  dy = 1.0 / Ny;
-  dz = 1.0 / Nz;
+  dx = 1.0 / (Nx-4);
+  dy = 1.0 / (Ny-4);
+  dz = 1.0 / (Nz-4);
 
   PrimitiveArray = (double*) malloc(stride[0]*sizeof(double));
   memcpy(PrimitiveArray, P, stride[0]*sizeof(double));
@@ -167,8 +166,6 @@ int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
 int solve_quartic_approx1(double *x);
 int solve_quartic_approx2(double *x);
 
-int report_cons_to_prim_failure(const double *U, const double *P);
-int report_nonphysical_failure (const double *U, const double *P);
 int hll_flux (const double *pl, const double *pr, double *U, double *F, double s);
 int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s);
 int hllc_set_dimension(int d);
@@ -254,6 +251,9 @@ int hll_flux(const double *pl, const double *pr, double *U, double *F, double s)
   double ap = (epl>epr) ? epl : epr;
   double am = (eml<emr) ? eml : emr;
 
+  double ml = (fabs(am)<fabs(ap)) ? fabs(ap) : fabs(am);
+  if (lib_state.max_lambda < ml) lib_state.max_lambda = ml;
+
   double F_hll[8], U_hll[8];
   for (i=0; i<8; ++i)
     {
@@ -276,33 +276,16 @@ int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr)
 {
   const size_t S = stride[dimension];
   const size_t T = 2*S;
+  int i;
 
   // Here, Pr refers to the left edge of cell i+1
   //       Pl refers to the rght edge of cell i
 
-  Pr[rho] = P0[S+rho] - 0.5*plm_minmod(P0[ 0+rho], P0[S+rho], P0[T+rho]);
-  Pl[rho] = P0[0+rho] + 0.5*plm_minmod(P0[-S+rho], P0[0+rho], P0[S+rho]);
-
-  Pr[pre] = P0[S+pre] - 0.5*plm_minmod(P0[ 0+pre], P0[S+pre], P0[T+pre]);
-  Pl[pre] = P0[0+pre] + 0.5*plm_minmod(P0[-S+pre], P0[0+pre], P0[S+pre]);
-
-  Pr[vx] = P0[S+vx] - 0.5*plm_minmod(P0[ 0+vx], P0[S+vx], P0[T+vx]);
-  Pl[vx] = P0[0+vx] + 0.5*plm_minmod(P0[-S+vx], P0[0+vx], P0[S+vx]);
-
-  Pr[vy] = P0[S+vy] - 0.5*plm_minmod(P0[ 0+vy], P0[S+vy], P0[T+vy]);
-  Pl[vy] = P0[0+vy] + 0.5*plm_minmod(P0[-S+vy], P0[0+vy], P0[S+vy]);
-
-  Pr[vz] = P0[S+vz] - 0.5*plm_minmod(P0[ 0+vz], P0[S+vz], P0[T+vz]);
-  Pl[vz] = P0[0+vz] + 0.5*plm_minmod(P0[-S+vz], P0[0+vz], P0[S+vz]);
-
-  Pr[Bx] = P0[S+Bx] - 0.5*plm_minmod(P0[ 0+Bx], P0[S+Bx], P0[T+Bx]);
-  Pl[Bx] = P0[0+Bx] + 0.5*plm_minmod(P0[-S+Bx], P0[0+Bx], P0[S+Bx]);
-
-  Pr[By] = P0[S+By] - 0.5*plm_minmod(P0[ 0+By], P0[S+By], P0[T+By]);
-  Pl[By] = P0[0+By] + 0.5*plm_minmod(P0[-S+By], P0[0+By], P0[S+By]);
-
-  Pr[Bz] = P0[S+Bz] - 0.5*plm_minmod(P0[ 0+Bz], P0[S+Bz], P0[T+Bz]);
-  Pl[Bz] = P0[0+Bz] + 0.5*plm_minmod(P0[-S+Bz], P0[0+Bz], P0[S+Bz]);
+  for (i=0; i<8; ++i)
+    {
+      Pr[i] = P0[S+i] - 0.5*plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
+      Pl[i] = P0[0+i] + 0.5*plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
+    }
 
   return 0;
 }
@@ -316,24 +299,17 @@ int reconstruct_use_4vel(const double *P0,
 
   const size_t U = S/8;
   const size_t V = T/8;
+  int i;
 
   // Here, Pr refers to the left edge of cell i+1
   //       Pl refers to the rght edge of cell i
 
-  Pr[rho] = P0[S+rho] - 0.5*plm_minmod(P0[ 0+rho], P0[S+rho], P0[T+rho]);
-  Pl[rho] = P0[0+rho] + 0.5*plm_minmod(P0[-S+rho], P0[0+rho], P0[S+rho]);
-
-  Pr[pre] = P0[S+pre] - 0.5*plm_minmod(P0[ 0+pre], P0[S+pre], P0[T+pre]);
-  Pl[pre] = P0[0+pre] + 0.5*plm_minmod(P0[-S+pre], P0[0+pre], P0[S+pre]);
-
-  Pr[Bx] = P0[S+Bx] - 0.5*plm_minmod(P0[ 0+Bx], P0[S+Bx], P0[T+Bx]);
-  Pl[Bx] = P0[0+Bx] + 0.5*plm_minmod(P0[-S+Bx], P0[0+Bx], P0[S+Bx]);
-
-  Pr[By] = P0[S+By] - 0.5*plm_minmod(P0[ 0+By], P0[S+By], P0[T+By]);
-  Pl[By] = P0[0+By] + 0.5*plm_minmod(P0[-S+By], P0[0+By], P0[S+By]);
-
-  Pr[Bz] = P0[S+Bz] - 0.5*plm_minmod(P0[ 0+Bz], P0[S+Bz], P0[T+Bz]);
-  Pl[Bz] = P0[0+Bz] + 0.5*plm_minmod(P0[-S+Bz], P0[0+Bz], P0[S+Bz]);
+  for (i=0; i<8; ++i)
+    if (i==rho || i==pre || i==Bx || i==By || i==Bz)
+    {
+      Pr[i] = P0[S+i] - 0.5*plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
+      Pl[i] = P0[0+i] + 0.5*plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
+    }
 
   const double ux_r = ux[U] - 0.5*plm_minmod(ux[ 0], ux[U], ux[V]);
   const double ux_l = ux[0] + 0.5*plm_minmod(ux[-U], ux[0], ux[U]);
@@ -362,7 +338,6 @@ int dUdt_1d(const double *U, double *L)
   int failures,S,i;
 
   failures = cons_to_prim_array(U,P,stride[0]/8);
-  if (failures) return failures;
 
   dimension = 1;
   Fiph(P,F);
@@ -385,22 +360,21 @@ int dUdt_2d(const double *U, double *L)
   int i,sx=stride[1], sy=stride[2];
 
   int failures = cons_to_prim_array(U,P,stride[0]/8);
-  if (failures) return failures;
 
   dimension = 1;  Fiph(P,F);
   dimension = 2;  Fiph(P,G);
 
-  //  constraint_transport_2d(F,G);
+  constraint_transport_2d(F,G);
 
   for (i=sx; i<stride[0]; ++i)
     {
       L[i] = -(F[i] - F[i-sx])/dx - (G[i] - G[i-sy])/dy;
     }
-  return 0;
+  return failures;
 }
 int dUdt_3d(const double *U, double *L)
 {
-  return 0;
+  return 1;
 }
 int Fiph(const double *P, double *F)
 {
@@ -470,10 +444,10 @@ int constraint_transport_2d(double *Fx, double *Fy)
   const int sx=stride[1],sy=stride[2];
   for (i=sx; i<stride[0]-sx; i+=8)
     {
-      double *F = &Fx[i];
-      double *G = &Fy[i];
-      FxBy[i/8] = (2*F[By]+F[By+sy]+F[By-sy]-G[Bx]-G[Bx+sx]-G[Bx-sy]-G[Bx+sx-sy])*0.125;
-      FyBx[i/8] = (2*G[Bx]+G[Bx+sx]+G[Bx-sx]-F[By]-F[By+sy]-F[By-sx]-F[By-sx+sy])*0.125;
+      double *F = &Fx[By+i];
+      double *G = &Fy[Bx+i];
+      FxBy[i/8] = (2*F[0]+F[sy]+F[-sy]-G[0]-G[sx]-G[-sy]-G[ sx-sy])*0.125;
+      FyBx[i/8] = (2*G[0]+G[sx]+G[-sx]-F[0]-F[sy]-F[-sx]-F[-sx+sy])*0.125;
     }
   for (i=0; i<stride[0]; i+=8)
     {
@@ -484,7 +458,6 @@ int constraint_transport_2d(double *Fx, double *Fy)
   free(FxBy);
   free(FyBx);
 }
-
 int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am)
 {
   const double v2   =   P[vx]*P[vx] + P[vy]*P[vy] + P[vz]*P[vz];
@@ -567,7 +540,6 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
   const double A1 = -4*K*V3 - L*vi*2   - 2*b0*bi;
   const double A0 =    K*V4 + L*V2     +   bi*bi;
 
-
   new_QuarticEquation(A4,A3,A2,A1,A0);
   switch (lib_state.mode_quartic_solver)
     {
@@ -586,6 +558,7 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 
 	*ap = (nr==2) ? ((nr12==2) ? ap12 : ap34) : ((ap12>ap34) ? ap12 : ap34);
 	*am = (nr==2) ? ((nr12==2) ? am12 : am34) : ((am12<am34) ? am12 : am34);
+	//	printf("eigenvalues: nr = %d, r1, r2, r3, r4 = %f %f %f %f, ap=%f, am=%f\n", nr, r1,r2,r3,r4, *ap, *am);
       }
       break;
 
@@ -613,6 +586,12 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
       break;
     }
 
+  if (fabs(*ap)>1.0 || fabs(*am)>1.0)
+    {
+      *ap =  1.0;
+      *am = -1.0;
+    }
+
   return 0;
 }
 
@@ -620,7 +599,7 @@ int cons_to_prim_point(const double *U, double *P)
 {
   static const double PRES_FLOOR = 1e-10;
   static const double ERROR_TOLR = 1e-6;
-  static const int NEWTON_MAX_ITER = 15;
+  static const int NEWTON_MAX_ITER = 25;
 
   // Quantites known from conserved
   const double gamf  = (lib_state.adiabatic_gamma - 1.0) / lib_state.adiabatic_gamma;
@@ -738,27 +717,17 @@ int cons_to_prim_array(const double *U, double *P, int N)
   int failures = 0;
   int i;
 
-  /* --------------------------------------------------------------------------------
-    Inspect the library state and select a strategy for inverting the conserved array
-  */
-  if (libopstate == LibraryOperation_Dead)
-    {
-
-    }
-  else if (libopstate == LibraryOperation_Alive && P != PrimitiveArray)
-    {                            // Replace the input array if not library's own copy
+  if (libopstate == LibraryOperation_Alive &&
+      P != PrimitiveArray)
+    {                            
       memcpy(P, PrimitiveArray, stride[0]*sizeof(double));
     }
-  else if (libopstate == LibraryOperation_Alive && P == PrimitiveArray)
-    {
-
-    }
-  /* ----------------------------------------------------------------------------- */
 
   for (i=0; i<N*8; i+=8)
     {
       const double *Ui = &U[i];
       double       *Pi = &P[i];
+
       failures += cons_to_prim_point(Ui,Pi);
 
       if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity &&
@@ -807,42 +776,5 @@ int prim_to_cons_array(const double *P, double *U, int N)
     {
       prim_to_cons_point(&P[i], &U[i]);
     }
-  return 0;
-}
-
-
-int report_nonphysical_failure(const double *U, const double *P)
-{
-  printf("\n\n ## FATAL ERROR! ZMHD encountered nonphysical quantities!\n\n");
-  printf("D   = %f\n", U[ddd]);
-  printf("tau = %f\n", U[tau]);
-  printf("Sx  = %f\n", U[Sx ]);
-  printf("Sy  = %f\n", U[Sy ]);
-  printf("Sz  = %f\n", U[Sz ]);
-  printf("Bx  = %f\n", U[Bx ]);
-  printf("By  = %f\n", U[By ]);
-  printf("Bz  = %f\n", U[Bz ]);
-
-  printf("Pressure = %f\n", P[pre]);
-  printf("Density  = %f\n", P[rho]);
-  printf("vx       = %f\n", P[vx]);
-  printf("vy       = %f\n", P[vy]);
-  printf("vz       = %f\n", P[vz]);
-  return 0;
-}
-
-
-int report_cons_to_prim_failure(const double *U, const double *P)
-{
-  printf("\n\n ## FATAL ERROR! ZMHD encountered primitive recovery failure!\n\n");
-  printf("The conserved state which choked the solver was:\n");
-
-  double P_tmp[8];
-  report_nonphysical_failure(U,P);
-  memcpy(P_tmp, P, 8*sizeof(double));
-
-  printf("\n\nHere is the output of the solver as it is failing:\n\n");
-  lib_state.cons_to_prim_verbose = 1;
-  cons_to_prim_point(U,P_tmp);
   return 0;
 }

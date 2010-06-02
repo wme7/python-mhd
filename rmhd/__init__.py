@@ -50,9 +50,8 @@ class LibraryState(Structure):
         self.plm_theta                 = 2.0
 
         self.mode_riemann_solver       = 0 # HLL approximate solver
-        self.mode_quartic_solver       = 0 # Exact solver
         self.mode_reconstruct          = 2 # PLM on 4-velocity
-
+        self.mode_quartic_solver       = 0 # Exact solver
 
         for k in kwargs:
             try: self.__getattribute__(k)
