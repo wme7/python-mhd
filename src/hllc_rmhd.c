@@ -17,7 +17,8 @@
 #include <stdio.h>
 #include <math.h>
 
-#define SMALL_BX 1e-10
+#define SMALL_BX 1e-12
+#define SMALL_A  1e-10
 
 // Enums used for indexing through primitive/conserved
 // data. The state of a given cell is described by 8
@@ -101,7 +102,7 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
 	(F_hll[B2]*F_hll[B2] + F_hll[B3]*F_hll[B3]);
       const double c =  U_hll[S1 ] - B_dot_FB;
 
-      P_[v1] = lc = (-b - sqrt(b*b - 4*a*c)) / (2*a); // take root with the minus sign
+      P_[v1] = lc = (fabs(a) < SMALL_A) ? -c/b : (-b - sqrt(b*b - 4*a*c)) / (2*a);
       P_[v2] = (U_hll[B2]*P_[v1] - F_hll[B2]) / U_hll[B1]; // eqn (38)
       P_[v3] = (U_hll[B3]*P_[v1] - F_hll[B3]) / U_hll[B1];
 
@@ -121,14 +122,14 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
       Ul_[tau] = (am*Ul[tau] - Ul[S1] + P_[pre]*P_[v1] - v_dotB_*P_[B1]) / (am - P_[v1]);
       Ur_[tau] = (ap*Ur[tau] - Ur[S1] + P_[pre]*P_[v1] - v_dotB_*P_[B1]) / (ap - P_[v1]);
 
+      Ul_[S1 ] = (Ul_[tau] + P_[pre])*P_[v1] - v_dotB_*P_[B1];
+      Ur_[S1 ] = (Ur_[tau] + P_[pre])*P_[v1] - v_dotB_*P_[B1];
+
       Ul_[S2 ] = (-P_[B1]*(P_[B2]/gm2_ + v_dotB_*P_[v2]) + am*Ul[S2] - Fl[S2]) / (am - P_[v1]);
       Ur_[S2 ] = (-P_[B1]*(P_[B2]/gm2_ + v_dotB_*P_[v2]) + ap*Ur[S2] - Fr[S2]) / (ap - P_[v1]);
 
       Ul_[S3 ] = (-P_[B1]*(P_[B3]/gm2_ + v_dotB_*P_[v3]) + am*Ul[S3] - Fl[S3]) / (am - P_[v1]);
       Ur_[S3 ] = (-P_[B1]*(P_[B3]/gm2_ + v_dotB_*P_[v3]) + ap*Ur[S3] - Fr[S3]) / (ap - P_[v1]);
-
-      Ul_[S1 ] = (Ul_[tau] + P_[pre])*P_[v1] - v_dotB_*P_[B1];
-      Ur_[S1 ] = (Ur_[tau] + P_[pre])*P_[v1] - v_dotB_*P_[B1];
 
       Ul_[B1] = Ur_[B1] = P_[B1];
       Ul_[B2] = Ur_[B2] = P_[B2];
@@ -140,7 +141,7 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
       const double b = -F_hll[S1 ] - U_hll[tau];
       const double c =  U_hll[S1 ];
 
-      const double v1_ = lc = (-b - sqrt(b*b - 4*a*c)) / (2*a);
+      const double v1_ = lc = (fabs(a) < SMALL_A) ? -c/b : (-b - sqrt(b*b - 4*a*c)) / (2*a);
       const double p_  = -F_hll[tau]*v1_ + F_hll[S1];
 
       Ul_[ddd] = (am - Pl[v1]) / (am - v1_) * Ul[ddd];

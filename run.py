@@ -1,43 +1,6 @@
 #!/usr/bin/env python
 
 
-def riemann_wave_patter():
-
-    from rmhd import _lib, visual, LibraryState
-    from numpy import zeros, array, linspace
-    from pylab import show
-
-    problem = RMHDShockTube2(L={'B':[1e-4,2.0,2.0]}, R={'B':[1e-4,-2.0,2.0]})
-    Pl, Pr = problem.get_states()
-
-    Pl = array(Pl)
-    Pr = array(Pr)
-
-    Nx = 1024
-    x = linspace(-1.5,1.5,Nx)
-    F, U, P, Ul, Ur = zeros(8),zeros(8),zeros(8),zeros(8),zeros(8)
-    P_hllc, P_hll = zeros((Nx,8)),zeros((Nx,8))
-
-    _lib.set_state(LibraryState(cons_to_prim_use_estimate=1))
-
-    for i in range(Nx):
-
-        U = zeros(8)
-
-        _lib.hll_flux(Pl,Pr,U,F,x[i])
-        if _lib.cons_to_prim_point(U,P_hll[i,:]):
-            print "Warning! HLL generated non-invertible intermediate cons state."
-
-        _lib.hllc_flux(Pl,Pr,U,F,x[i])
-        if _lib.cons_to_prim_point(U,P_hllc[i,:]):
-            print "Warning! HLLC generated non-invertible intermediate cons state."
-
-
-    visual.shocktube(P_hll , x=(-1.5,1.5), label="HLL" , linestyle='-.', marker='None', lw=6)
-    visual.shocktube(P_hllc, x=(-1.5,1.5), label="HLLC", linestyle='-' , marker='None')
-    show()
-
-
 
 def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=False):
 
@@ -64,6 +27,7 @@ def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=Fal
     while t < tfinal:
 
         start = time()
+        n_cycle += 1
 
         e1 = lib.dUdt_1d(U,L)
         e2 = lib.dUdt_1d(U + 0.5*dt*L,L)
@@ -74,7 +38,6 @@ def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=Fal
 
         U += dt*L
         t += dt
-        n_cycle += 1
 
         U[ 0:4,   :] = U[   4,:] # Boundary conditions
         U[Nx-4:Nx,:] = U[Nx-5,:]
@@ -91,7 +54,7 @@ def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=Fal
 
 
 
-def run_2d_problem(lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, verbose=True):
+def run_2d_problem(lib, state, problem, RK_order=2, Nx=128, Ny=128, CFL=0.5, tfinal=0.2):
 
     from numpy import zeros
 
@@ -115,29 +78,11 @@ def run_2d_problem(lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, ver
 
     ttltime = 0.0
     n_cycle = 0
-    while t < tfinal:
 
-        start = time()
 
-        e1 = lib.dUdt_2d(U,L)
-        e2 = lib.dUdt_2d(U + 0.5*dt*L,L)
+    def dUdt(U):
 
-        if e1 or e2:
-            print "Run crashed! Sorry...", e1, e2
-            break
-
-        """
-        e1 = lib.dUdt_2d(U,L)
-        if e1:
-            print "Run crashed! Sorry...", e1
-            break
-        """
-
-        U += dt*L
-        t += dt
-        n_cycle += 1
-
-        Ng = 4
+        Ng = 2
         for i in range(Ng): # Boundary conditions
             U[   i  ,:] = U[   Ng  ,:]
             U[Nx-i-1,:] = U[Nx-Ng-1,:]
@@ -145,10 +90,28 @@ def run_2d_problem(lib, state, problem, Nx=128, Ny=128, CFL=0.5, tfinal=0.2, ver
             U[:,   i  ] = U[:,   Ng  ]
             U[:,Ny-i-1] = U[:,Ny-Ng-1]
 
-        ttltime += time()-start
+        e = lib.dUdt_2d(U,L)
+        if e: print "Run crashed with %d failures, sorry..." % e
+        return L
 
-        if verbose:
-            print "t =", t
+
+    while t < tfinal:
+
+        n_cycle += 1
+        start = time()
+
+        if RK_order is 2:
+            U += dt*dUdt(U + 0.5*dt*dUdt(U))
+
+        elif RK_order is 3:
+            U1 =      U +                  dt * dUdt(U )
+            U1 = 3./4*U + 1./4*U1 + 1./4 * dt * dUdt(U1)
+            U  = 1./3*U + 2./3*U1 + 2./3 * dt * dUdt(U1)
+
+        t += dt
+        ttltime += time()-start
+        print "t =", t
+
 
     lib.cons_to_prim_array(U,P,Nx*Ny)
     lib.finalize()
@@ -219,6 +182,51 @@ def compare_riemann_solver():
 
     rmhd.visual.shocktube(P0, label="HLL", linestyle='--', mfc='None')
     rmhd.visual.shocktube(P1, label="HLLC", linestyle='-', mfc='None')
+    show()
+
+
+def riemann_wave_pattern():
+
+    from rmhd import _lib, visual, LibraryState
+    from numpy import zeros, array, linspace
+    from pylab import show
+
+    problem = RMHDRotationalWave()
+    Pl, Pr = problem.get_states()
+
+    Pl = array(Pl)
+    Pr = array(Pr)
+
+    Nx = 512
+    x = linspace(-2.0,2.0,Nx)
+    F, U, P, Ul, Ur = zeros(8),zeros(8),zeros(8),zeros(8),zeros(8)
+    P_hllc, P_hll = zeros((Nx,8)),zeros((Nx,8))
+
+    _lib.set_state(LibraryState(cons_to_prim_use_estimate=1))
+
+    for i in range(Nx):
+
+        U = zeros(8)
+
+        _lib.hll_flux(Pl,Pr,U,F,x[i])
+        if _lib.cons_to_prim_point(U,P_hll[i,:]):
+            print "Warning! HLL  generated non-invertible intermediate cons state."
+
+        _lib.hllc_flux(Pl,Pr,U,F,x[i])
+        if _lib.cons_to_prim_point(U,P_hllc[i,:]):
+            print "Warning! HLLC generated non-invertible intermediate cons state."
+
+    state0 = LibraryState(mode_riemann_solver=0)
+    state1 = LibraryState(mode_riemann_solver=1)
+
+    run_args = {'Nx':Nx, 'CFL':0.2, 'tfinal':0.25}
+    P_run  = run_1d_problem(_lib, state0, problem, **run_args)
+    P_runc = run_1d_problem(_lib, state1, problem, **run_args)
+
+    visual.shocktube(P_hll , x=(0,1), label="HLL" , linestyle='-.', marker='None', lw=6)
+    visual.shocktube(P_hllc, x=(0,1), label="HLLC", linestyle='-' , marker='None')
+    visual.shocktube(P_run , x=(0,1), label="run hll ", linestyle=':', marker='None', lw=2.5)
+    visual.shocktube(P_runc, x=(0,1), label="run hllc", linestyle='-', marker='None', lw=0.5)
     show()
 
 
@@ -293,13 +301,12 @@ def library_dead_unit_test():
 def test_2d():
 
     from rmhd import _lib, LibraryState, visual
-    from numpy import array, zeros
-    from pylab import show, imshow, colorbar
+    from pylab import show
 
-    state = LibraryState(plm_theta=2.0, mode_reconstruct=0, mode_riemann_solver=1)
-    problem = RMHDCylindricalA(pre=1.0)
-    P = run_2d_problem(_lib, state, problem, Nx=128, Ny=128, CFL=0.4, tfinal=0.2)
-    visual.four_pane_2d(P, x=(-1,1))
+    state = LibraryState(plm_theta=1.0, mode_reconstruct=2, mode_riemann_solver=1)
+    problem = RMHDCylindricalA(pre=100.0)
+    P = run_2d_problem(_lib, state, problem, RK_order=3, Nx=128, Ny=128, CFL=0.4, tfinal=0.2)
+    visual.four_pane_2dA(P, extent=[0,1,0,1])
     show()
 
 
@@ -310,6 +317,6 @@ if __name__ == "__main__":
     #compare_riemann_solver()
     #compare_reconstruct()
     #compare_quartic()
-    #riemann_wave_patter()
+    #riemann_wave_pattern()
     #library_dead_unit_test()
     test_2d()

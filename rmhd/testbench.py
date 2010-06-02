@@ -5,6 +5,7 @@ to_array = lambda S: [S['Rho'], S['Pre'],
                       S['B'][0], S['B'][1], S['B'][2]]
 
 
+
 class CylindricalProblem:
 
     def __init__(self, I={ }, O={ }, gamma=1.4):
@@ -19,63 +20,24 @@ class CylindricalProblem:
     def initial_model(self, P):
 
         assert len(P.shape) is 3
-        from numpy import array
+        from numpy import sqrt, array, zeros_like, linspace, where, newaxis
 
         Nx, Ny = P.shape[0:2]
 
-        for i in range(Nx):
-            for j in range(Ny):
-                if (i-Nx/2)**2 + (j-Ny/2)**2 < (0.1*(Nx+Ny))**2:
-                    P[i,j,:] = array(to_array(self.I_state))
-                else:
-                    P[i,j,:] = array(to_array(self.O_state))
+        X = linspace(-1,1,Nx)[:,newaxis]
+        Y = linspace(-1,1,Ny)[newaxis,:]
+
+        PI = zeros_like(P)
+        PO = zeros_like(P)
+
+        for i in range(8):
+            PI[:,:,i] = to_array(self.I_state)[i]
+            PO[:,:,i] = to_array(self.O_state)[i]
+
+        for i in range(8):
+            P[:,:,i] = where(sqrt(X**2 + Y**2) < 0.16, PI[:,:,i], PO[:,:,i])
 
 
-class ShockTubeProblem:
-
-    def __init__(self, L={ }, R={ }, gamma=1.4):
-
-        self._setup()
-
-        self.L_state.update(L)
-        self.R_state.update(R)
-        self.adiabatic_gamma = gamma
-
-    def initial_model(self, P):
-        
-        if len(P.shape) is 2:
-            Nx = P.shape[0]
-
-            for i in range(8):
-                P[:Nx/2,i] = to_array(self.L_state)[i]
-                P[Nx/2:,i] = to_array(self.R_state)[i]
-
-        elif len(P.shape) is 3:
-
-            Nx, Ny = P.shape[0:2]
-
-            try:
-                if self.orientation == 'x':
-                    for i in range(8):
-                        P[:Nx/2,:,i] = to_array(self.L_state)[i]
-                        P[Nx/2:,:,i] = to_array(self.R_state)[i]
-
-                elif self.orientation == 'y':
-                    for i in range(8):
-                        P[:,:Ny/2,i] = to_array(self.L_state)[i]
-                        P[:,Ny/2:,i] = to_array(self.R_state)[i]
-
-            except AttributeError:
-                for i in range(8):
-                    P[:Nx/2,:,i] = to_array(self.L_state)[i]
-                    P[Nx/2:,:,i] = to_array(self.R_state)[i]
-
-        else: raise Exception
-
-
-    def get_states(self):
-
-        return to_array(self.L_state), to_array(self.R_state)
 
 
 class RMHDCylindricalA(CylindricalProblem):
@@ -87,8 +49,60 @@ class RMHDCylindricalA(CylindricalProblem):
 
     def _setup(self):
 
-        self.I_state = { 'Rho':1.0, 'Pre':self.pre, 'v': [0,0,0], 'B': [1,0,0] }
-        self.O_state = { 'Rho':1.0, 'Pre':    0.01, 'v': [0,0,0], 'B': [1,0,0] }
+        self.I_state = { 'Rho':1.0, 'Pre':self.pre, 'v': [0,0,0], 'B': [4,0,0] }
+        self.O_state = { 'Rho':1.0, 'Pre':    0.01, 'v': [0,0,0], 'B': [4,0,0] }
+
+
+
+class ShockTubeProblem:
+
+    def __init__(self, L={ }, R={ }, gamma=1.4, orientation='x'):
+
+        self._setup()
+
+        self.L_state.update(L)
+        self.R_state.update(R)
+        self.adiabatic_gamma = gamma
+        self.orientation = orientation
+
+    def initial_model(self, P):
+
+        if len(P.shape) is 2:
+
+            Nx = P.shape[0]
+
+            for i in range(8):
+                P[:Nx/2,i] = to_array(self.L_state)[i]
+                P[Nx/2:,i] = to_array(self.R_state)[i]
+
+        elif len(P.shape) is 3:
+
+            """
+            Offer the option to transpose shocktube direction. This may be
+            useful in checking the dimensional equivalence of 2d algorithms.
+            """
+            Nx, Ny = P.shape[0:2]
+
+            if self.orientation == 'x':
+
+                for i in range(8):
+                    P[:Nx/2 ,:,i] = to_array(self.L_state)[i]
+                    P[ Nx/2:,:,i] = to_array(self.R_state)[i]
+
+            elif self.orientation == 'y':
+
+                for S in [self.L_state, self.R_state]:
+                    S['v'][0], S['v'][1] = S['v'][1], S['v'][0]
+                    S['B'][0], S['B'][1] = S['B'][1], S['B'][0]
+
+                for i in range(8):
+                    P[:,:Ny/2 ,i] = to_array(self.L_state)[i]
+                    P[:, Ny/2:,i] = to_array(self.R_state)[i]
+
+
+    def get_states(self):
+
+        return to_array(self.L_state), to_array(self.R_state)
 
 
 
@@ -101,9 +115,9 @@ class SRShockTube1(ShockTubeProblem):
     See: http://relativity.livingreviews.org/Articles/lrr-2003-7/
     """
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 
@@ -120,9 +134,9 @@ class SRShockTube2(ShockTubeProblem):
     See: http://relativity.livingreviews.org/Articles/lrr-2003-7/
     """
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 
@@ -132,9 +146,9 @@ class SRShockTube2(ShockTubeProblem):
 
 class RMHDShockTube1(ShockTubeProblem):
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 
@@ -144,9 +158,9 @@ class RMHDShockTube1(ShockTubeProblem):
 
 class RMHDShockTube2(ShockTubeProblem):
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 
@@ -156,9 +170,9 @@ class RMHDShockTube2(ShockTubeProblem):
 
 class RMHDShockTube3(ShockTubeProblem):
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 
@@ -168,9 +182,9 @@ class RMHDShockTube3(ShockTubeProblem):
 
 class RMHDShockTube4(ShockTubeProblem):
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 
@@ -180,9 +194,9 @@ class RMHDShockTube4(ShockTubeProblem):
 
 class RMHDContactWave(ShockTubeProblem):
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 
@@ -192,9 +206,9 @@ class RMHDContactWave(ShockTubeProblem):
 
 class RMHDRotationalWave(ShockTubeProblem):
 
-    def __init__(self, L={ }, R={ }, gamma=1.4):
+    def __init__(self, **kwargs):
 
-        ShockTubeProblem.__init__(self, L=L, R=R, gamma=gamma)
+        ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup(self):
 

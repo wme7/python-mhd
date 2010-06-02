@@ -390,7 +390,7 @@ int dUdt_2d(const double *U, double *L)
   dimension = 1;  Fiph(P,F);
   dimension = 2;  Fiph(P,G);
 
-  constraint_transport_2d(F,G);
+  //  constraint_transport_2d(F,G);
 
   for (i=sx; i<stride[0]; ++i)
     {
