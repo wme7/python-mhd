@@ -18,6 +18,7 @@ _lib = CDLL(_lib_home+'/librmhd.so')
 import testbench
 import riemann
 import visual
+import driver
 
 
 class LibraryState(Structure):
@@ -63,7 +64,7 @@ class LibraryState(Structure):
 const_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS'))
 write_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS', 'WRITEABLE'))
 
-_lib.initialize        .argtypes = [const_array, c_int, c_int, c_int]
+_lib.initialize        .argtypes = [const_array] + [c_int]*3 + [c_double]*3
 _lib.finalize          .argtypes = [ ]
 _lib.dUdt_1d           .argtypes = [const_array, write_array]
 _lib.dUdt_2d           .argtypes = [const_array, write_array]

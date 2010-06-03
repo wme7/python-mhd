@@ -144,3 +144,8 @@ def shocktube(P, x=(-1,1), **kwargs):
 
     subplots_adjust(hspace=0.05)
 
+
+def show():
+
+    from pylab import show
+    show()

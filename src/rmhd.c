@@ -96,7 +96,7 @@ struct LibraryState get_state()
   return lib_state;
 }
 
-int initialize(double *P, int Nx, int Ny, int Nz)
+int initialize(double *P, int Nx, int Ny, int Nz, double Lx, double Ly, double Lz)
 {
   libopstate = LibraryOperation_Alive;
 
@@ -106,9 +106,11 @@ int initialize(double *P, int Nx, int Ny, int Nz)
   stride[3] =          8;
   dimension = 1;
 
-  dx = 1.0 / (Nx-4);
-  dy = 1.0 / (Ny-4);
-  dz = 1.0 / (Nz-4);
+  int Ng = 2; // Number of guard cells required for the scheme
+
+  dx = Lx / (Nx-2*Ng);
+  dy = Ly / (Ny-2*Ng);
+  dz = Lz / (Nz-2*Ng);
 
   PrimitiveArray = (double*) malloc(stride[0]*sizeof(double));
   memcpy(PrimitiveArray, P, stride[0]*sizeof(double));

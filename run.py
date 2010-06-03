@@ -2,130 +2,6 @@
 
 
 
-def run_1d_problem(lib, state, problem, Nx=128, CFL=0.5, tfinal=0.2, verbose=False):
-
-    from numpy import zeros
-
-    P = zeros((Nx,8))
-    U = zeros((Nx,8))
-    L = zeros((Nx,8))
-
-    state.adiabatic_gamma = problem.adiabatic_gamma
-    problem.initial_model(P)
-    lib.set_state(state)
-    lib.initialize(P,Nx,1,1)
-    lib.prim_to_cons_array(P,U,Nx)
-
-    dx  = 1.0 / Nx
-    t   = 0.0
-    dt  = CFL * dx
-
-    from time import time
-
-    ttltime = 0.0
-    n_cycle = 0
-    while t < tfinal:
-
-        start = time()
-        n_cycle += 1
-
-        e1 = lib.dUdt_1d(U,L)
-        e2 = lib.dUdt_1d(U + 0.5*dt*L,L)
-
-        if e1 or e2:
-            print "Run crashed! Sorry...", e1, e2
-            break
-
-        U += dt*L
-        t += dt
-
-        U[ 0:4,   :] = U[   4,:] # Boundary conditions
-        U[Nx-4:Nx,:] = U[Nx-5,:]
-
-        ttltime += time()-start
-
-        if verbose:
-            print "t =", t
-
-    lib.cons_to_prim_array(U,P,Nx)
-    lib.finalize()
-    print "Solver averaged %f us/zone" % (ttltime / (Nx*8*n_cycle)*1e6)
-    return P
-
-
-
-def run_2d_problem(lib, state, problem, RK_order=2, Nx=128, Ny=128, CFL=0.5, tfinal=0.2):
-
-    from numpy import zeros, zeros_like
-
-    P = zeros((Nx,Ny,8))
-    U = zeros((Nx,Ny,8))
-
-    state.adiabatic_gamma = 1.4
-    problem.initial_model(P)
-
-    lib.set_state(state)
-    lib.initialize(P,Nx,Ny,1)
-    lib.prim_to_cons_array(P,U,Nx*Ny)
-
-    dx = 1.0 / (Nx-4);
-    dy = 1.0 / (Ny-4);
-
-    t   = 0.0
-    dt  = 1e-8
-
-    from time import time
-
-    ttltime = 0.0
-    n_cycle = 0
-
-    def dUdt(U):
-        L = zeros_like(U)
-        Ng = 2
-        for i in range(Ng): # Boundary conditions
-            U[   i  ,:] = U[   Ng  ,:]
-            U[Nx-i-1,:] = U[Nx-Ng-1,:]
-
-            U[:,   i  ] = U[:,   Ng  ]
-            U[:,Ny-i-1] = U[:,Ny-Ng-1]
-
-        failures = lib.dUdt_2d(U,L)
-        if failures: print "dUdt got %d failures" % failures
-        return L
-
-
-    while t < tfinal:
-
-        n_cycle += 1
-        start = time()
-
-        if RK_order is 1:
-            U += dt*dUdt(U)
-
-        if RK_order is 2:
-            L1 = dUdt(U);
-            U += dt*dUdt(U + 0.5*dt*L1);
-
-        elif RK_order is 3:
-
-            U1 =      U +                  dt * dUdt(U )
-            U1 = 3./4*U + 1./4*U1 + 1./4 * dt * dUdt(U1)
-            U  = 1./3*U + 2./3*U1 + 2./3 * dt * dUdt(U1)
-
-        t += dt
-        ttltime += time()-start
-        print "t = %8.6f, dt = %5.4e" % (t,dt)
-
-        dt = CFL * min([dx,dy])
-
-
-    lib.cons_to_prim_array(U,P,Nx*Ny)
-    lib.finalize()
-    print "Solver averaged %f us/zone" % (ttltime / (Nx*Ny*8*n_cycle)*1e6)
-    return P
-
-
-
 
 def sr_shocktube():
 
@@ -173,29 +49,31 @@ def compare_reconstruct():
 
 def compare_riemann_solver():
 
-    from pylab import show
-    import rmhd
+    from rmhd import LibraryState, visual, _lib
+    from rmhd.driver import ProblemDriver
 
+    driver = ProblemDriver(N=(512,), L=(1.0,))
     problem = RMHDContactWave()
 
-    state0  = rmhd.LibraryState(mode_riemann_solver=0, mode_reconstruct=2)
-    state1  = rmhd.LibraryState(mode_riemann_solver=1, mode_reconstruct=2)
+    state0  = LibraryState(mode_riemann_solver=0, mode_reconstruct=2)
+    state1  = LibraryState(mode_riemann_solver=1, mode_reconstruct=2)
 
-    run_args = {'Nx':512, 'CFL':0.1, 'tfinal':0.2}
+    run_args = {'CFL':0.1, 'tfinal':0.2}
 
-    P0 = run_1d_problem(rmhd._lib, state0, problem, **run_args)
-    P1 = run_1d_problem(rmhd._lib, state1, problem, **run_args)
+    P0 = driver.run(_lib, state0, problem, **run_args)
+    P1 = driver.run(_lib, state1, problem, **run_args)
 
-    rmhd.visual.shocktube(P0, label="HLL", linestyle='--', mfc='None')
-    rmhd.visual.shocktube(P1, label="HLLC", linestyle='-', mfc='None')
-    show()
+    visual.shocktube(P0, label="HLL", linestyle='--', mfc='None')
+    visual.shocktube(P1, label="HLLC", linestyle='-', mfc='None')
+    visual.show()
+
 
 
 def riemann_wave_pattern():
 
     from rmhd import _lib, visual, LibraryState
     from numpy import zeros, array, linspace
-    from pylab import show
+
 
     problem = RMHDRotationalWave()
     Pl, Pr = problem.get_states()
@@ -233,13 +111,12 @@ def riemann_wave_pattern():
     visual.shocktube(P_hllc, x=(0,1), label="HLLC", linestyle='-' , marker='None')
     visual.shocktube(P_run , x=(0,1), label="run hll ", linestyle=':', marker='None', lw=2.5)
     visual.shocktube(P_runc, x=(0,1), label="run hllc", linestyle='-', marker='None', lw=0.5)
-    show()
+    visual.show()
 
 
 
 def compare_quartic():
 
-    from pylab import show
     import rmhd
 
     problem = RMHDShockTube4()
@@ -260,7 +137,7 @@ def compare_quartic():
     rmhd.visual.shocktube(P1, label="Approx1", linestyle='-.', mfc='None')
     rmhd.visual.shocktube(P2, label="Approx2", linestyle=':', marker='None')
     rmhd.visual.shocktube(P3, label="None", linestyle='-', marker='None')
-    show()
+    rmhd.visual.show()
 
 
 
@@ -322,19 +199,23 @@ def divergence_2d_cross_stencil(f,g):
     return div
 
 
+
 def test_2d():
 
     from rmhd import _lib, LibraryState, visual
-    from pylab import show, imshow, colorbar
+    from rmhd.driver import ProblemDriver
 
-    state = LibraryState(plm_theta=2.0, mode_reconstruct=1, mode_riemann_solver=0,
+    state = LibraryState(plm_theta=2.0, mode_reconstruct=2, mode_riemann_solver=0,
                          mode_quartic_solver=0)
 
-    problem = RMHDCylindricalA(pre=100.0)
-    P = run_2d_problem(_lib, state, problem, RK_order=3, Nx=260, Ny=260, CFL=0.6, tfinal=0.8)
+    driver = ProblemDriver(N=(132,132), L=(2,2))
 
-    visual.four_pane_2dA(P, extent=[0,1,0,1])
-    show()
+    problem = RMHDCylindricalA(pre=1.0)
+
+    P = driver.run(_lib, state, problem, RK_order=3, CFL=0.6, tfinal=0.4)
+
+    visual.four_pane_2dA(P, extent=[-1,1,-1,1])
+    visual.show()
 
 
 if __name__ == "__main__":
