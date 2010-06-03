@@ -64,7 +64,7 @@ class LibraryState(Structure):
 const_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS'))
 write_array = ndpointer(dtype=float64, flags=('C_CONTIGUOUS', 'WRITEABLE'))
 
-_lib.initialize        .argtypes = [const_array] + [c_int]*3 + [c_double]*3
+_lib.initialize        .argtypes = [const_array] + [c_int]*3 + [c_double]*3 + [c_int]
 _lib.finalize          .argtypes = [ ]
 _lib.dUdt_1d           .argtypes = [const_array, write_array]
 _lib.dUdt_2d           .argtypes = [const_array, write_array]

@@ -7,9 +7,9 @@
  * PURPOSE: Provide a derivative operator, dUdt, for the conserved quantites
  *   of the Relativistic MHD equations. Internal memory is allocated for the
  *   set of primitive quantites, as well 4-velocites.
- * 
+ *
  * REFERENCES:
- *   
+ *
  *
  * USAGE: Either in Alive or Dead mode:
  *
@@ -42,19 +42,19 @@ enum { rho, pre, vx, vy, vz };             // Primitive
 // Modes for selecting the strategy of the solver
 
 enum RiemannSolverMode { RiemannSolver_HLL,
-			 RiemannSolver_HLLC };
+                         RiemannSolver_HLLC };
 
 enum ReconstructMode { Reconstruct_PiecewiseConstant,
-		       Reconstruct_PLM3Velocity,
-		       Reconstruct_PLM4Velocity };
+                       Reconstruct_PLM3Velocity,
+                       Reconstruct_PLM4Velocity };
 
 enum QuarticSolverMode { QuarticSolver_Exact,
-			 QuarticSolver_Approx1,
-			 QuarticSolver_Approx2,
-			 QuarticSolver_None };
+                         QuarticSolver_Approx1,
+                         QuarticSolver_Approx2,
+                         QuarticSolver_None };
 
 enum LibraryOperationMode { LibraryOperation_Alive,
-			    LibraryOperation_Dead }
+                            LibraryOperation_Dead }
   libopstate = LibraryOperation_Dead;
 
 int dimension=1;
@@ -75,10 +75,10 @@ struct LibraryState
   int mode_reconstruct;
   int mode_quartic_solver;
 } lib_state = { 0,0,0,
-		0.0,1.4,2.0,
-		RiemannSolver_HLL,
-		Reconstruct_PLM4Velocity,
-		QuarticSolver_Exact };
+                0.0,1.4,2.0,
+                RiemannSolver_HLL,
+                Reconstruct_PLM4Velocity,
+                QuarticSolver_Exact };
 
 double *PrimitiveArray;
 double *FluxInterArray_x;
@@ -96,8 +96,27 @@ struct LibraryState get_state()
   return lib_state;
 }
 
-int initialize(double *P, int Nx, int Ny, int Nz, double Lx, double Ly, double Lz)
+int quiet = 0;
+int initialize(double *P, int Nx, int Ny, int Nz,
+               double Lx, double Ly, double Lz, int q)
 {
+  quiet = q;
+  if (!quiet)
+    {
+      printf("\n\n\n");
+      printf("************** Initiating RMHD back-end **************\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("******************************************************\n");
+      printf("\n\n");
+
+      printf("Grid size     ............   (%3d, %3d, %3d)\n"   , Nx,Ny,Nz);
+      printf("Domain size   ............   (%2.1f, %2.1f, %2.1f)\n", Lx,Ly,Lz);
+    }
+
   libopstate = LibraryOperation_Alive;
 
   stride[0] = Nx*Ny*Nz*8;
@@ -127,6 +146,19 @@ int initialize(double *P, int Nx, int Ny, int Nz, double Lx, double Ly, double L
 }
 int finalize()
 {
+  if (!quiet)
+    {
+      printf("\n\n\n");
+      printf("************** Finalizing RMHD back-end **************\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("*                                                    *\n");
+      printf("******************************************************\n");
+      printf("\n\n\n");
+    }
+
   libopstate = LibraryOperation_Dead;
   free(PrimitiveArray);
 
@@ -157,8 +189,8 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 
 int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr);
 int reconstruct_use_4vel(const double *P0,
-			 const double *ux, const double *uy, const double *uz,
-			 double *Pl, double *Pr);
+                         const double *ux, const double *uy, const double *uz,
+                         double *Pl, double *Pr);
 
 int constraint_transport_2d(double *Fx, double *Fy);
 
@@ -293,8 +325,8 @@ int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr)
 }
 
 int reconstruct_use_4vel(const double *P0,
-			 const double *ux, const double *uy, const double *uz,
-			 double *Pl, double *Pr)
+                         const double *ux, const double *uy, const double *uz,
+                         double *Pl, double *Pr)
 {
   const size_t S = stride[dimension];
   const size_t T = 2*S;
@@ -308,10 +340,10 @@ int reconstruct_use_4vel(const double *P0,
 
   for (i=0; i<8; ++i)
     if (i==rho || i==pre || i==Bx || i==By || i==Bz)
-    {
-      Pr[i] = P0[S+i] - 0.5*plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
-      Pl[i] = P0[0+i] + 0.5*plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
-    }
+      {
+        Pr[i] = P0[S+i] - 0.5*plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
+        Pl[i] = P0[0+i] + 0.5*plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
+      }
 
   const double ux_r = ux[U] - 0.5*plm_minmod(ux[ 0], ux[U], ux[V]);
   const double ux_l = ux[0] + 0.5*plm_minmod(ux[-U], ux[0], ux[U]);
@@ -419,17 +451,17 @@ int Fiph(const double *P, double *F)
 
       double U_star[8];
       switch (lib_state.mode_riemann_solver)
-	{
-	case RiemannSolver_HLL:
-	  hll_flux (Pl, Pr, U_star, &F[i], 0.0);
-	  break;
-	case RiemannSolver_HLLC:
-	  hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
-	  break;
-	default:
-	  hll_flux (Pl, Pr, U_star, &F[i], 0.0);
-	  break;
-	}
+        {
+        case RiemannSolver_HLL:
+          hll_flux (Pl, Pr, U_star, &F[i], 0.0);
+          break;
+        case RiemannSolver_HLLC:
+          hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
+          break;
+        default:
+          hll_flux (Pl, Pr, U_star, &F[i], 0.0);
+          break;
+        }
     }
   for (i=stride[0]-S*2; i<stride[0]; ++i)
     {
@@ -548,42 +580,42 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 
     case QuarticSolver_Exact:
       {
-	double r1, r2, r3, r4;
-	int nr12, nr34;
-	int nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
-	
-	double ap12 = (r1>r2) ? r1 : r2;
-	double ap34 = (r3>r4) ? r3 : r4;
+        double r1, r2, r3, r4;
+        int nr12, nr34;
+        int nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
 
-	double am12 = (r1<r2) ? r1 : r2;
-	double am34 = (r3<r4) ? r3 : r4;
+        double ap12 = (r1>r2) ? r1 : r2;
+        double ap34 = (r3>r4) ? r3 : r4;
 
-	*ap = (nr==2) ? ((nr12==2) ? ap12 : ap34) : ((ap12>ap34) ? ap12 : ap34);
-	*am = (nr==2) ? ((nr12==2) ? am12 : am34) : ((am12<am34) ? am12 : am34);
-	//	printf("eigenvalues: nr = %d, r1, r2, r3, r4 = %f %f %f %f, ap=%f, am=%f\n", nr, r1,r2,r3,r4, *ap, *am);
+        double am12 = (r1<r2) ? r1 : r2;
+        double am34 = (r3<r4) ? r3 : r4;
+
+        *ap = (nr==2) ? ((nr12==2) ? ap12 : ap34) : ((ap12>ap34) ? ap12 : ap34);
+        *am = (nr==2) ? ((nr12==2) ? am12 : am34) : ((am12<am34) ? am12 : am34);
+        //      printf("eigenvalues: nr = %d, r1, r2, r3, r4 = %f %f %f %f, ap=%f, am=%f\n", nr, r1,r2,r3,r4, *ap, *am);
       }
       break;
 
     case QuarticSolver_Approx1:
       {
-	*am = -1.0; *ap = 1.0;
-	solve_quartic_approx1(am);
-	solve_quartic_approx1(ap);
+        *am = -1.0; *ap = 1.0;
+        solve_quartic_approx1(am);
+        solve_quartic_approx1(ap);
       }
       break;
 
     case QuarticSolver_Approx2:
       {
-	*am = -1.0; *ap = 1.0;
-	solve_quartic_approx2(am);
-	solve_quartic_approx2(ap);
+        *am = -1.0; *ap = 1.0;
+        solve_quartic_approx2(am);
+        solve_quartic_approx2(ap);
       }
       break;
 
     case QuarticSolver_None:
       {
-	*ap =  1.0;
-	*am = -1.0;
+        *ap =  1.0;
+        *am = -1.0;
       }
       break;
     }
@@ -721,7 +753,7 @@ int cons_to_prim_array(const double *U, double *P, int N)
 
   if (libopstate == LibraryOperation_Alive &&
       P != PrimitiveArray)
-    {                            
+    {
       memcpy(P, PrimitiveArray, stride[0]*sizeof(double));
     }
 
@@ -733,13 +765,13 @@ int cons_to_prim_array(const double *U, double *P, int N)
       failures += cons_to_prim_point(Ui,Pi);
 
       if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity &&
-	  libopstate == LibraryOperation_Alive)
-	{
-	  double W = 1.0 / sqrt(1.0 - (Pi[vx]*Pi[vx] + Pi[vy]*Pi[vy] + Pi[vz]*Pi[vz]));
-	  lib_ux[i/8] = W*Pi[vx];
-	  lib_uy[i/8] = W*Pi[vy];
-	  lib_uz[i/8] = W*Pi[vz];
-	}
+          libopstate == LibraryOperation_Alive)
+        {
+          double W = 1.0 / sqrt(1.0 - (Pi[vx]*Pi[vx] + Pi[vy]*Pi[vy] + Pi[vz]*Pi[vz]));
+          lib_ux[i/8] = W*Pi[vx];
+          lib_uy[i/8] = W*Pi[vy];
+          lib_uz[i/8] = W*Pi[vz];
+        }
     }
   return failures;
 }
