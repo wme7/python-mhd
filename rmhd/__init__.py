@@ -2,7 +2,7 @@
 
 from ctypes import CDLL, Structure, c_double, c_int
 from numpy import float64, array, zeros, roll
-from numpy.ctypeslib import ndpointer, c_intp
+from numpy.ctypeslib import ndpointer
 from sys import path
 from os.path import abspath, dirname
 from os import popen
@@ -16,9 +16,11 @@ _lib = CDLL(_lib_home+'/librmhd.so')
 
 
 import testbench
-import riemann
 import visual
 import driver
+
+try: import riemann
+except ImportError: pass
 
 
 class LibraryState(Structure):

@@ -23,7 +23,7 @@ def sr_shocktube():
 def compare_reconstruct():
 
     from pylab import show
-    from rmhd import _lib, LibraryState, visual, riemann
+    from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
 
     driver = ProblemDriver(N=(1024,), L=(1.0,))
@@ -161,8 +161,44 @@ def cylindrical_blast():
 
     P = driver.run(_lib, state, problem, **run_args)
 
-    visual.four_pane_2dA(P, extent=[-1,1,-1,1])
+    visual.four_pane_2d(P, extent=[-1,1,-1,1])
     visual.show()
+
+
+
+def quadrant_test():
+
+    from rmhd import _lib, LibraryState, visual
+    from rmhd.driver import ProblemDriver
+
+    driver = ProblemDriver(N=(64,64), L=(2,2))
+    problem = SRQuadrantA()
+
+    states = [LibraryState(mode_reconstruct    = 0,
+                           mode_quartic_solver = 0),
+
+              LibraryState(mode_reconstruct    = 0,
+                           mode_quartic_solver = 3),
+
+              LibraryState(mode_reconstruct    = 2,
+                           mode_quartic_solver = 0),
+
+              LibraryState(mode_reconstruct    = 2,
+                           mode_quartic_solver = 3)]
+
+    run_args = {'name': "quadrant test",
+                'RK_order': 3, 'CFL': 0.2, 'tfinal': 0.2}
+
+    for n,state in enumerate(states):
+
+        state.plm_theta = 0.0
+        P = driver.run(_lib, state, problem, **run_args)
+        P.dump('quadrant%d.np' % (n+1))
+
+
+    visual.four_pane_2d(P, extent=[-1,1,-1,1], do_quiver=False)
+    visual.show()
+
 
 
 
@@ -171,11 +207,11 @@ if __name__ == "__main__":
     from rmhd.testbench import *
     from pylab import figure
 
-
     #sr_shocktube()
     #riemann_wave_pattern()
     #cylindrical_blast()
+    quadrant_test()
 
-    compare_riemann_solver()
+    #compare_riemann_solver()
     #compare_reconstruct()
     #compare_quartic()

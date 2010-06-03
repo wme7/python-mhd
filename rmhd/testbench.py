@@ -39,18 +39,71 @@ class CylindricalProblem:
 
 
 
-
 class RMHDCylindricalA(CylindricalProblem):
 
-    def __init__(self, I={ }, O={ }, pre=1.0, gamma=1.4):
+    def __init__(self, **kwargs):
 
         self.pre = pre
-        CylindricalProblem.__init__(self, I=I, O=O, gamma=gamma)
+        CylindricalProblem.__init__(self, **kwargs)
+
 
     def _setup(self):
 
         self.I_state = { 'Rho':1.0, 'Pre':self.pre, 'v': [0,0,0], 'B': [4,0,0] }
         self.O_state = { 'Rho':1.0, 'Pre':    0.01, 'v': [0,0,0], 'B': [4,0,0] }
+
+
+
+class QuadrantProblem:
+
+    def __init__(self, NE={ }, NW={ }, SE={ }, SW={ }, gamma=1.4):
+
+        self._setup()
+
+        self.NE_state.update(NE)
+        self.NW_state.update(NW)
+        self.SE_state.update(SE)
+        self.SW_state.update(SW)
+
+        self.adiabatic_gamma = gamma
+
+
+    def initial_model(self, P):
+
+        assert len(P.shape) is 3
+        from numpy import sqrt, array, zeros_like, linspace, where, newaxis
+
+        Nx, Ny = P.shape[0:2]
+
+        X = linspace(-1,1,Nx)[:,newaxis]
+        Y = linspace(-1,1,Ny)[newaxis,:]
+
+        SW = where((X<=0.0) * (Y<=0.0))
+        NW = where((X<=0.0) * (Y >0.0))
+        SE = where((X >0.0) * (Y<=0.0))
+        NE = where((X >0.0) * (Y >0.0))
+
+        for i in range(8):
+            P[:,:,i][SW] = to_array(self.SW_state)[i]
+            P[:,:,i][NW] = to_array(self.NW_state)[i]
+            P[:,:,i][SE] = to_array(self.SE_state)[i]
+            P[:,:,i][NE] = to_array(self.NE_state)[i]
+
+
+
+class SRQuadrantA(QuadrantProblem):
+
+    def __init__(self, **kwargs):
+
+        QuadrantProblem.__init__(self, **kwargs)
+
+
+    def _setup(self):
+
+        self.SW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
+        self.NW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.99, 0.00], 'B': [0,0,0] }
+        self.SE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.99, 0.00, 0.00], 'B': [0,0,0] }
+        self.NE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
 
 
 
@@ -64,6 +117,7 @@ class ShockTubeProblem:
         self.R_state.update(R)
         self.adiabatic_gamma = gamma
         self.orientation = orientation
+
 
     def initial_model(self, P):
 
@@ -119,6 +173,7 @@ class SRShockTube1(ShockTubeProblem):
 
         ShockTubeProblem.__init__(self, **kwargs)
 
+
     def _setup(self):
 
         self.L_state = { 'Rho':10.0, 'Pre':13.33, 'v': [0,0,0], 'B': [0,0,0] }
@@ -138,6 +193,7 @@ class SRShockTube2(ShockTubeProblem):
 
         ShockTubeProblem.__init__(self, **kwargs)
 
+
     def _setup(self):
 
         self.L_state = { 'Rho': 1.0, 'Pre':1000.00, 'v': [0,0,0], 'B': [0,0,0] }
@@ -149,6 +205,7 @@ class RMHDShockTube1(ShockTubeProblem):
     def __init__(self, **kwargs):
 
         ShockTubeProblem.__init__(self, **kwargs)
+
 
     def _setup(self):
 
@@ -162,6 +219,7 @@ class RMHDShockTube2(ShockTubeProblem):
 
         ShockTubeProblem.__init__(self, **kwargs)
 
+
     def _setup(self):
 
         self.L_state = { 'Rho': 1.08, 'Pre': 0.95, 'v': [ 0.40, 0.3, 0.2], 'B': [2.0, 0.3, 0.3] }
@@ -173,6 +231,7 @@ class RMHDShockTube3(ShockTubeProblem):
     def __init__(self, **kwargs):
 
         ShockTubeProblem.__init__(self, **kwargs)
+
 
     def _setup(self):
 
@@ -186,6 +245,7 @@ class RMHDShockTube4(ShockTubeProblem):
 
         ShockTubeProblem.__init__(self, **kwargs)
 
+
     def _setup(self):
 
         self.L_state = { 'Rho': 1.0, 'Pre': 5.0, 'v': [0.0, 0.3, 0.4], 'B': [1.0, 6.0, 2.0] }
@@ -198,6 +258,7 @@ class RMHDContactWave(ShockTubeProblem):
 
         ShockTubeProblem.__init__(self, **kwargs)
 
+
     def _setup(self):
 
         self.L_state = { 'Rho': 1.0, 'Pre': 1.0, 'v': [0.0, 0.7, 0.2], 'B': [5.0, 1.0, 0.5] }
@@ -209,6 +270,7 @@ class RMHDRotationalWave(ShockTubeProblem):
     def __init__(self, **kwargs):
 
         ShockTubeProblem.__init__(self, **kwargs)
+
 
     def _setup(self):
 

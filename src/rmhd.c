@@ -60,6 +60,7 @@ enum LibraryOperationMode { LibraryOperation_Alive,
 int dimension=1;
 int stride[4];
 double dx,dy,dz;
+double cons_to_prim_last_W;
 
 struct LibraryState
 {
@@ -104,13 +105,13 @@ int initialize(double *P, int Nx, int Ny, int Nz,
   if (!quiet)
     {
       printf("\n\n\n");
-      printf("************** Initiating RMHD back-end **************\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("******************************************************\n");
+      printf("\t************** Initiating RMHD back-end **************\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t******************************************************\n");
       printf("\n\n");
 
       printf("Grid size     ............   (%3d, %3d, %3d)\n"   , Nx,Ny,Nz);
@@ -149,13 +150,13 @@ int finalize()
   if (!quiet)
     {
       printf("\n\n\n");
-      printf("************** Finalizing RMHD back-end **************\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("*                                                    *\n");
-      printf("******************************************************\n");
+      printf("\t************** Finalizing RMHD back-end **************\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t******************************************************\n");
       printf("\n\n\n");
     }
 
@@ -331,8 +332,8 @@ int reconstruct_use_4vel(const double *P0,
   const size_t S = stride[dimension];
   const size_t T = 2*S;
 
-  const size_t U = S/8;
-  const size_t V = T/8;
+  const size_t U = stride[dimension]/8;
+  const size_t V = 2*U;
   int i;
 
   // Here, Pr refers to the left edge of cell i+1
@@ -354,8 +355,8 @@ int reconstruct_use_4vel(const double *P0,
   const double uz_r = uz[U] - 0.5*plm_minmod(uz[ 0], uz[U], uz[V]);
   const double uz_l = uz[0] + 0.5*plm_minmod(uz[-U], uz[0], uz[U]);
 
-  const double Wr = sqrt(1 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
-  const double Wl = sqrt(1 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
+  const double Wr = sqrtf(1 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
+  const double Wl = sqrtf(1 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
 
   Pr[vx] = ux_r/Wr;  Pr[vy] = uy_r/Wr;  Pr[vz] = uz_r/Wr;
   Pl[vx] = ux_l/Wl;  Pl[vy] = uy_l/Wl;  Pl[vz] = uz_l/Wl;
@@ -500,7 +501,7 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
   const double W    =   1.0 / sqrt(1.0 - v2);
   const double W2   =   W*W;
   const double b0   =   W * Bv;
-  const double b2   =   (B2 + b0*b0) / (W*W);
+  const double b2   =   (B2 + b0*b0) / W2;
   const double bx   =   (P[Bx] + b0 * W*P[vx]) / W;
   const double by   =   (P[By] + b0 * W*P[vy]) / W;
   const double bz   =   (P[Bz] + b0 * W*P[vz]) / W;
@@ -561,9 +562,9 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 
   const double W4   =  W2*W2;
   const double cs2  =  eos_cs2(P[rho],P[pre]);
-  const double V2   =  pow(vi,2.);
-  const double V3   =  pow(vi,3.);
-  const double V4   =  pow(vi,4.);
+  const double V2   =  vi*vi;
+  const double V3   =  vi*V2;
+  const double V4   =  vi*V3;
 
   const double K  =    P[rho]*h * (1./cs2-1.) * W4;
   const double L  =  -(P[rho]*h +  b2/cs2)    * W2;
@@ -592,7 +593,6 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 
         *ap = (nr==2) ? ((nr12==2) ? ap12 : ap34) : ((ap12>ap34) ? ap12 : ap34);
         *am = (nr==2) ? ((nr12==2) ? am12 : am34) : ((am12<am34) ? am12 : am34);
-        //      printf("eigenvalues: nr = %d, r1, r2, r3, r4 = %f %f %f %f, ap=%f, am=%f\n", nr, r1,r2,r3,r4, *ap, *am);
       }
       break;
 
@@ -614,16 +614,16 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 
     case QuarticSolver_None:
       {
-        *ap =  1.0;
         *am = -1.0;
+        *ap =  1.0;
       }
       break;
     }
 
   if (fabs(*ap)>1.0 || fabs(*am)>1.0)
     {
-      *ap =  1.0;
       *am = -1.0;
+      *ap =  1.0;
     }
 
   return 0;
@@ -744,6 +744,8 @@ int cons_to_prim_point(const double *U, double *P)
   P[By ] =   U[By];
   P[Bz ] =   U[Bz];
 
+  cons_to_prim_last_W = W;
+
   return 0;
 }
 int cons_to_prim_array(const double *U, double *P, int N)
@@ -767,7 +769,7 @@ int cons_to_prim_array(const double *U, double *P, int N)
       if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity &&
           libopstate == LibraryOperation_Alive)
         {
-          double W = 1.0 / sqrt(1.0 - (Pi[vx]*Pi[vx] + Pi[vy]*Pi[vy] + Pi[vz]*Pi[vz]));
+          double W = cons_to_prim_last_W;
           lib_ux[i/8] = W*Pi[vx];
           lib_uy[i/8] = W*Pi[vy];
           lib_uz[i/8] = W*Pi[vz];
@@ -783,7 +785,7 @@ int prim_to_cons_point(const double *P, double *U)
   const double W2   =   1.0 / (1.0 - v2);
   const double W    =   sqrt(W2);
   const double b0   =   W * Bv;
-  const double b2   =   (B2 + b0*b0) / (W*W);
+  const double b2   =   (B2 + b0*b0) / W2;
   const double bx   =   (P[Bx] + b0 * W*P[vx]) / W;
   const double by   =   (P[By] + b0 * W*P[vy]) / W;
   const double bz   =   (P[Bz] + b0 * W*P[vz]) / W;

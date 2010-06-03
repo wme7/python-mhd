@@ -1,6 +1,6 @@
 
 
-def four_pane_2dA(P, extent=[0,1,0,1], **kwargs):
+def four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, **kwargs):
 
     from pylab import flipud, subplot, title, colorbar, cm, imshow, quiver
     from numpy import sqrt, linspace, meshgrid
@@ -38,10 +38,11 @@ def four_pane_2dA(P, extent=[0,1,0,1], **kwargs):
     colorbar()
     title("Lorentz Factor")
 
-    N = 10
-    X,Y = meshgrid(linspace(extent[0],extent[1],W.shape[0]),
-                   linspace(extent[2],extent[3],W.shape[1]))
-    quiver(X[::N,::N], Y[::N,::N], Bx[::N,::N].T, By[::N,::N].T, color='y')
+    if do_quiver:
+        N = 10
+        X,Y = meshgrid(linspace(extent[0],extent[1],W.shape[0]),
+                       linspace(extent[2],extent[3],W.shape[1]))
+        quiver(X[::N,::N], Y[::N,::N], Bx[::N,::N].T, By[::N,::N].T, color='y')
 
     """
     Don't mess with the way the data are transposed here, I have checked carefully
@@ -51,44 +52,6 @@ def four_pane_2dA(P, extent=[0,1,0,1], **kwargs):
     See link for examples on how to use quiver:
     http://matplotlib.sourceforge.net/examples/pylab_examples/quiver_demo.html
     """
-
-
-def four_pane_2dB(P, extent=[0,1,0,1], **kwargs):
-
-    from pylab import subplot, title, colorbar, cm, imshow, quiver
-    from numpy import sqrt, linspace, meshgrid
-
-    rho, pre   = P[:,:,0], P[:,:,1]
-    vx, vy, vz = P[:,:,2], P[:,:,3], P[:,:,4]
-    Bx, By, Bz = P[:,:,5], P[:,:,6], P[:,:,7]
-
-    B2 = Bx**2 + By**2 + Bz**2
-    v2 = vx**2 + vy**2 + vz**2
-    W2 = 1.0 / (1.0 - v2)
-
-    imargs = {'extent':extent, 'cmap':cm.hot, 'interpolation':'bilinear'}
-    imargs.update(kwargs)
-
-    subplot(2,2,1)
-    imshow(Bx.T)
-    colorbar()
-    title(r"$Bx$")
-
-    subplot(2,2,2)
-    imshow(By.T, **imargs)
-    colorbar()
-    title(r"$By$")
-
-    subplot(2,2,3)
-    imshow(Bz.T, **imargs)
-    colorbar()
-    title(r"$Bz$")
-
-    subplot(2,2,4)
-    imshow(sqrt(W2).T, **imargs)
-    colorbar()
-    title("Lorentz Factor")
-
 
 
 def shocktube(P, x=(-1,1), **kwargs):
