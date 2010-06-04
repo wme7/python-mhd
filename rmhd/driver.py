@@ -49,9 +49,11 @@ class ProblemDriver:
         return U
 
 
-    def run(self, lib, state, problem, name="no run name", **kwargs):
+    def run(self, lib, state, problem, name=None, **kwargs):
 
         from time import time
+
+        if name is None: name = problem.__class__
 
         run_func = { 1: self.run_1d, 2: self.run_2d, 3: self.run_3d }
         start_time = time()
@@ -78,7 +80,7 @@ class ProblemDriver:
         lib.initialize(P, Nx, 1, 1, Lx, 0.0, 0.0, 1)
         lib.prim_to_cons_array(P,U,U.size/8)
 
-        dx = 1.0 * Lx / (Nx-4);
+        dx = 1.0 * Lx / (Nx-2*self.Ng);
 
         self.CFL = CFL
         self.tfinal = tfinal
@@ -110,8 +112,8 @@ class ProblemDriver:
         lib.initialize(P, Nx, Ny, 1, Lx, Ly, 0.0, 0)
         lib.prim_to_cons_array(P,U,U.size/8)
 
-        dx = 1.0 * Lx / (Nx-4);
-        dy = 1.0 * Ly / (Ny-4);
+        dx = 1.0 * Lx / (Nx-2*self.Ng);
+        dy = 1.0 * Ly / (Ny-2*self.Ng);
 
         self.CFL = CFL
         self.tfinal = tfinal
@@ -126,7 +128,38 @@ class ProblemDriver:
 
 
     def run_3d(self, lib, state, problem, RK_order=2, CFL=0.5, tfinal=0.2):
-        pass
+
+        from numpy import zeros
+
+        self.lib = lib
+        Nx,Ny,Nz = self.N
+        Lx,Ly,Lz = self.L
+
+        P = zeros((Nx,Ny,Nz,8))
+        U = zeros((Nx,Ny,Nz,8))
+
+        state.adiabatic_gamma = problem.adiabatic_gamma
+        problem.initial_model(P)
+
+        lib.set_state(state)
+        lib.initialize(P, Nx, Ny, Nz, Lx, Ly, Lz, 0)
+        lib.prim_to_cons_array(P,U,U.size/8)
+
+        dx = 1.0 * Lx / (Nx-2*self.Ng)
+        dy = 1.0 * Ly / (Ny-2*self.Ng)
+        dz = 1.0 * Lz / (Nz-2*self.Ng)
+
+        self.CFL = CFL
+        self.tfinal = tfinal
+        self.RK_order = RK_order
+        self.min_dx = min([dx,dy,dz])
+        self.quiet = False
+        U = self.main_loop(U)
+
+        lib.cons_to_prim_array(U,P,U.size/8)
+        lib.finalize()
+        return P
+
 
 
     def dUdt_1d(self, U):
@@ -164,4 +197,23 @@ class ProblemDriver:
 
 
     def dUdt_3d(self, U):
-        pass
+
+        from numpy import zeros_like
+        L = zeros_like(U)
+
+        Ng = self.Ng
+        Nx,Ny,Nz = self.N
+
+        for i in range(Ng): # Boundary conditions
+            U[   i  ,:,:,:] = U[   Ng  ,:,:,:]
+            U[Nx-i-1,:,:,:] = U[Nx-Ng-1,:,:,:]
+
+            U[:,   i  ,:,:] = U[:,   Ng  ,:,:]
+            U[:,Ny-i-1,:,:] = U[:,Ny-Ng-1,:,:]
+
+            U[:,:,   i  ,:] = U[:,:,   Ng  ,:]
+            U[:,:,Nz-i-1,:] = U[:,:,Nz-Ng-1,:]
+
+        self.failures += self.lib.dUdt_3d(U,L)
+        return L
+

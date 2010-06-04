@@ -1,5 +1,28 @@
 
 
+def contour_2d(P, fig, extent=[0,1,0,1], caption=None):
+
+    assert len(P.shape) is 2
+
+    from numpy import linspace, logspace, log10
+    from pylab import contour, figure, title
+
+    Nx, Ny = P.shape
+    P = P[2:Nx-2,2:Ny-2]
+    Nx, Ny = P.shape
+
+    X = linspace(-1, 1, Nx)
+    Y = linspace(-1, 1, Ny)
+    levels = logspace(log10(P.min()), log10(P.max()), 30)
+
+    ax1 = fig.add_subplot(1,1,1)
+    contour(X, Y, P, levels, extent=extent)
+    ax1.set_aspect('equal')
+
+    if title is not None:
+        title(caption)
+
+
 def four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, **kwargs):
 
     from pylab import flipud, subplot, title, colorbar, cm, imshow, quiver

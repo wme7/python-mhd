@@ -19,29 +19,54 @@ class CylindricalProblem:
 
     def initial_model(self, P):
 
-        assert len(P.shape) is 3
         from numpy import sqrt, array, zeros_like, linspace, where, newaxis
 
-        Nx, Ny = P.shape[0:2]
+        if len(P.shape) is 3:
 
-        X = linspace(-1,1,Nx)[:,newaxis]
-        Y = linspace(-1,1,Ny)[newaxis,:]
+            Nx, Ny = P.shape[0:2]
 
-        PI = zeros_like(P)
-        PO = zeros_like(P)
+            X = linspace(-1,1,Nx)[:,newaxis]
+            Y = linspace(-1,1,Ny)[newaxis,:]
 
-        for i in range(8):
-            PI[:,:,i] = to_array(self.I_state)[i]
-            PO[:,:,i] = to_array(self.O_state)[i]
+            PI = zeros_like(P)
+            PO = zeros_like(P)
 
-        for i in range(8):
-            P[:,:,i] = where(sqrt(X**2 + Y**2) < 0.16, PI[:,:,i], PO[:,:,i])
+            for i in range(8):
+                PI[:,:,i] = to_array(self.I_state)[i]
+                PO[:,:,i] = to_array(self.O_state)[i]
 
+            for i in range(8):
+                P[:,:,i] = where(sqrt(X**2 + Y**2) < 0.16,
+                                 PI[:,:,i], PO[:,:,i])
+
+
+        elif len(P.shape) is 4:
+
+            Nx, Ny, Nz = P.shape[0:3]
+
+            X = linspace(-1,1,Nx)[:,newaxis,newaxis]
+            Y = linspace(-1,1,Ny)[newaxis,:,newaxis]
+            Z = linspace(-1,1,Nz)[newaxis,newaxis,:]
+
+            PI = zeros_like(P)
+            PO = zeros_like(P)
+
+            for i in range(8):
+                PI[:,:,:,i] = to_array(self.I_state)[i]
+                PO[:,:,:,i] = to_array(self.O_state)[i]
+
+            for i in range(8):
+                P[:,:,:,i] = where(sqrt(X**2 + Y**2 + Z**2) < 0.16,
+                                   PI[:,:,:,i], PO[:,:,:,i])
+
+        else:
+            print "Cylindrical setup only available in 2 or 3 dimensions!"
+            raise RuntimeWarning
 
 
 class RMHDCylindricalA(CylindricalProblem):
 
-    def __init__(self, **kwargs):
+    def __init__(self, pre=1.0, **kwargs):
 
         self.pre = pre
         CylindricalProblem.__init__(self, **kwargs)
@@ -101,8 +126,24 @@ class SRQuadrantA(QuadrantProblem):
     def _setup(self):
 
         self.SW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
-        self.NW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.99, 0.00], 'B': [0,0,0] }
-        self.SE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.99, 0.00, 0.00], 'B': [0,0,0] }
+        self.NW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.99, 0.00, 0.00], 'B': [0,0,0] }
+        self.SE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.99, 0.00], 'B': [0,0,0] }
+        self.NE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
+
+
+
+class SRQuadrantB(QuadrantProblem):
+
+    def __init__(self, **kwargs):
+
+        QuadrantProblem.__init__(self, **kwargs)
+
+
+    def _setup(self):
+
+        self.SW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
+        self.NW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.80, 0.00, 0.00], 'B': [0,0,0] }
+        self.SE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.80, 0.00], 'B': [0,0,0] }
         self.NE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
 
 

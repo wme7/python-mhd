@@ -166,18 +166,18 @@ def cylindrical_blast():
 
 
 
-def quadrant_test():
+def symmetry_test1():
 
-    from rmhd import _lib, LibraryState, visual
+    from rmhd import _lib, LibraryState
     from rmhd.driver import ProblemDriver
 
-    driver = ProblemDriver(N=(64,64), L=(2,2))
+    driver = ProblemDriver(N=(32,32), L=(2,2))
     problem = SRQuadrantA()
 
-    states = [LibraryState(mode_reconstruct    = 0,
+    states = [LibraryState(mode_reconstruct    = 1,
                            mode_quartic_solver = 0),
 
-              LibraryState(mode_reconstruct    = 0,
+              LibraryState(mode_reconstruct    = 1,
                            mode_quartic_solver = 3),
 
               LibraryState(mode_reconstruct    = 2,
@@ -186,32 +186,98 @@ def quadrant_test():
               LibraryState(mode_reconstruct    = 2,
                            mode_quartic_solver = 3)]
 
-    run_args = {'name': "quadrant test",
+    run_args = {'name': "symmetry test",
                 'RK_order': 3, 'CFL': 0.2, 'tfinal': 0.2}
 
     for n,state in enumerate(states):
 
-        state.plm_theta = 0.0
+        state.plm_theta = 2.0
         P = driver.run(_lib, state, problem, **run_args)
         P.dump('quadrant%d.np' % (n+1))
 
+    from os import system
+    system('./symmetry.py')
 
-    visual.four_pane_2d(P, extent=[-1,1,-1,1], do_quiver=False)
-    visual.show()
 
 
+def symmetry_test2():
+
+    from rmhd import _lib, LibraryState, visual
+    from rmhd.driver import ProblemDriver
+    from pylab import figure, savefig
+
+    probs = [SRQuadrantA(), SRQuadrantB()]
+    names = ['A', 'B']
+
+    driver = ProblemDriver(N=(256,256), L=(2,2))
+    state = LibraryState()
+
+    run_args = {'RK_order': 2, 'CFL': 0.6, 'tfinal': 0.8}
+    caption = r"Quadrant Problem %s after $t=0.8s$  $N=256^2$  PLM=$2.0$  CFL=$0.6$  RK=$2$  HLL"
+
+    for prob, name in zip(probs, names):
+
+        P = driver.run(_lib, state, prob, **run_args)
+        fig = figure(figsize=(10,12))
+        visual.contour_2d(P[:,:,0], fig, extent=[-1,1,-1,1], caption=caption % name)
+        savefig('quadrant%s.png' % name)
+
+
+
+def cross_stencil_div_3d(fx,fy,fz,dx=1,dy=1,dz=1):
+
+    from numpy import zeros
+    assert fx.shape == fy.shape and fy.shape == fz.shape
+    Nx, Ny, Nz = fx.shape
+
+    div = zeros((Nx,Ny,Nz))
+    for i in range(1,Nx-1):
+        for j in range(1,Ny-1):
+            for k in range(1,Nz-1):
+
+                div[i,j,k] = \
+                ((fx[i+1,j,k] + fx[i+1,j+1,k] + fx[i+1,j,k+1] + fx[i+1,j+1,k+1]) - (fx[i,j,k] + fx[i,j+1,k] + fx[i,j,k+1] + fx[i,j+1,k+1])) / (4*dx) + \
+                ((fy[i,j+1,k] + fy[i,j+1,k+1] + fy[i+1,j+1,k] + fy[i+1,j+1,k+1]) - (fy[i,j,k] + fy[i,j,k+1] + fy[i+1,j,k] + fy[i+1,j,k+1])) / (4*dy) + \
+                ((fz[i,j,k+1] + fz[i+1,j,k+1] + fz[i,j+1,k+1] + fz[i+1,j+1,k+1]) - (fz[i,j,k] + fz[i+1,j,k] + fz[i,j+1,k] + fz[i+1,j+1,k])) / (4*dz)
+
+    return div
+
+
+def spherical_blast_3d():
+
+
+    from rmhd import _lib, LibraryState, visual
+    from rmhd.driver import ProblemDriver
+    from pylab import figure, savefig, imshow, show, colorbar
+
+    noB = {'B':[0.5,0,0]}
+
+    problem = RMHDCylindricalA( I=noB, O=noB )
+    driver = ProblemDriver(N=(64,64,64), L=(2,2,2))
+    state = LibraryState()
+
+    run_args = {'RK_order': 3, 'CFL': 0.3, 'tfinal': 0.4}
+    P = driver.run(_lib, state, problem, **run_args)
+
+    div = cross_stencil_div_3d(P[:,:,:,5],P[:,:,:,6],P[:,:,:,7])
+
+    #visual.four_pane_2d(P[:,:,32], extent=[-1,1,-1,1])
+    imshow(div[:,:,32])
+    colorbar()
+    show()
 
 
 if __name__ == "__main__":
 
     from rmhd.testbench import *
-    from pylab import figure
+    from pylab import figure, zeros, imshow, show
 
     #sr_shocktube()
     #riemann_wave_pattern()
     #cylindrical_blast()
-    quadrant_test()
+    #symmetry_test1()
 
     #compare_riemann_solver()
     #compare_reconstruct()
     #compare_quartic()
+    spherical_blast_3d()

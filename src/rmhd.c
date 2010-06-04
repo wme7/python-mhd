@@ -113,9 +113,9 @@ int initialize(double *P, int Nx, int Ny, int Nz,
       printf("\t*                                                    *\n");
       printf("\t******************************************************\n");
       printf("\n\n");
-
-      printf("Grid size     ............   (%3d, %3d, %3d)\n"   , Nx,Ny,Nz);
+      printf("Grid size     ............   (%  3d, %  3d, %  3d)\n", Nx,Ny,Nz);
       printf("Domain size   ............   (%2.1f, %2.1f, %2.1f)\n", Lx,Ly,Lz);
+      printf("\n\n");
     }
 
   libopstate = LibraryOperation_Alive;
@@ -194,6 +194,7 @@ int reconstruct_use_4vel(const double *P0,
                          double *Pl, double *Pr);
 
 int constraint_transport_2d(double *Fx, double *Fy);
+int constraint_transport_3d(double *Fx, double *Fy, double *Fz);
 
 int new_QuarticEquation(double d4, double d3, double d2, double d1, double d0);
 int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
@@ -355,8 +356,8 @@ int reconstruct_use_4vel(const double *P0,
   const double uz_r = uz[U] - 0.5*plm_minmod(uz[ 0], uz[U], uz[V]);
   const double uz_l = uz[0] + 0.5*plm_minmod(uz[-U], uz[0], uz[U]);
 
-  const double Wr = sqrtf(1 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
-  const double Wl = sqrtf(1 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
+  const double Wr = sqrt(1.0 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
+  const double Wl = sqrt(1.0 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
 
   Pr[vx] = ux_r/Wr;  Pr[vy] = uy_r/Wr;  Pr[vz] = uz_r/Wr;
   Pl[vx] = ux_l/Wl;  Pl[vy] = uy_l/Wl;  Pl[vz] = uz_l/Wl;
@@ -380,7 +381,7 @@ int dUdt_1d(const double *U, double *L)
   S = stride[dimension];
   for (i=S; i<stride[0]; ++i)
     {
-      L[i] = -(F[i] - F[i-S])/dx;
+      L[i] = -(F[i]-F[i-S])/dx;
     }
   return failures;
 }
@@ -392,7 +393,7 @@ int dUdt_2d(const double *U, double *L)
   double *P = PrimitiveArray;
   double *F = FluxInterArray_x;
   double *G = FluxInterArray_y;
-  int i,sx=stride[1], sy=stride[2];
+  int i,sx=stride[1],sy=stride[2];
 
   int failures = cons_to_prim_array(U,P,stride[0]/8);
 
@@ -403,13 +404,34 @@ int dUdt_2d(const double *U, double *L)
 
   for (i=sx; i<stride[0]; ++i)
     {
-      L[i] = -(F[i] - F[i-sx])/dx - (G[i] - G[i-sy])/dy;
+      L[i] = -(F[i]-F[i-sx])/dx - (G[i]-G[i-sy])/dy;
     }
   return failures;
 }
 int dUdt_3d(const double *U, double *L)
 {
-  return 1;
+  if (libopstate == LibraryOperation_Dead)
+    return 1;
+
+  double *P = PrimitiveArray;
+  double *F = FluxInterArray_x;
+  double *G = FluxInterArray_y;
+  double *H = FluxInterArray_z;
+
+  int i,sx=stride[1],sy=stride[2],sz=stride[3];
+  int failures = cons_to_prim_array(U,P,stride[0]/8);
+
+  dimension = 1;  Fiph(P,F);
+  dimension = 2;  Fiph(P,G);
+  dimension = 3;  Fiph(P,H);
+
+  constraint_transport_3d(F,G,H);
+
+  for (i=sx; i<stride[0]; ++i)
+    {
+      L[i] = -(F[i]-F[i-sx])/dx - (G[i]-G[i-sy])/dy - (H[i]-H[i-sz])/dz;
+    }
+  return failures;
 }
 int Fiph(const double *P, double *F)
 {
@@ -475,12 +497,15 @@ int constraint_transport_2d(double *Fx, double *Fy)
   double *FxBy = (double*) malloc(stride[0]/8*sizeof(double));
   double *FyBx = (double*) malloc(stride[0]/8*sizeof(double));
 
+  double *F, *G, *H;
   int i;
+
   const int sx=stride[1],sy=stride[2];
   for (i=sx; i<stride[0]-sx; i+=8)
     {
-      double *F = &Fx[By+i];
-      double *G = &Fy[Bx+i];
+      F = &Fx[By+i];
+      G = &Fy[Bx+i];
+
       FxBy[i/8] = (2*F[0]+F[sy]+F[-sy]-G[0]-G[sx]-G[-sy]-G[ sx-sy])*0.125;
       FyBx[i/8] = (2*G[0]+G[sx]+G[-sx]-F[0]-F[sy]-F[-sx]-F[-sx+sy])*0.125;
     }
@@ -492,6 +517,51 @@ int constraint_transport_2d(double *Fx, double *Fy)
 
   free(FxBy);
   free(FyBx);
+}
+int constraint_transport_3d(double *Fx, double *Fy, double *Fz)
+{
+  double *FxBy = (double*) malloc(stride[0]/8*sizeof(double));
+  double *FxBz = (double*) malloc(stride[0]/8*sizeof(double));
+
+  double *FyBz = (double*) malloc(stride[0]/8*sizeof(double));
+  double *FyBx = (double*) malloc(stride[0]/8*sizeof(double));
+
+  double *FzBx = (double*) malloc(stride[0]/8*sizeof(double));
+  double *FzBy = (double*) malloc(stride[0]/8*sizeof(double));
+
+  double *F, *G, *H;
+  int i;
+
+  const int sx=stride[1],sy=stride[2],sz=stride[3];
+  for (i=sx; i<stride[0]-sx; i+=8)
+    {
+      F = &Fx[By+i];
+      G = &Fy[Bx+i];
+
+      FxBy[i/8] = (2*F[0]+F[sy]+F[-sy]-G[0]-G[sx]-G[-sy]-G[ sx-sy])*0.125;
+      FyBx[i/8] = (2*G[0]+G[sx]+G[-sx]-F[0]-F[sy]-F[-sx]-F[-sx+sy])*0.125;
+
+      G = &Fy[Bz+i];
+      H = &Fz[By+i];
+
+      FyBz[i/8] = (2*G[0]+G[sz]+G[-sz]-H[0]-H[sy]-H[-sz]-H[ sy-sz])*0.125;
+      FzBy[i/8] = (2*H[0]+H[sy]+H[-sy]-G[0]-G[sz]-G[-sy]-G[-sy+sz])*0.125;
+
+      H = &Fz[Bx+i];
+      F = &Fx[Bz+i];
+
+      FzBx[i/8] = (2*H[0]+H[sx]+H[-sx]-F[0]-F[sz]-F[-sx]-F[ sz-sx])*0.125;
+      FxBz[i/8] = (2*F[0]+F[sz]+F[-sz]-H[0]-H[sx]-H[-sz]-H[-sz+sx])*0.125;
+    }
+  for (i=0; i<stride[0]; i+=8)
+    {
+      Fx[i+Bx] = 0.0;        Fx[i+By] = FxBy[i/8];  Fx[i+Bz] = FxBz[i/8];
+      Fy[i+Bx] = FyBx[i/8];  Fy[i+By] = 0.0;        Fy[i+Bz] = FyBz[i/8];
+      Fz[i+Bx] = FzBx[i/8];  Fz[i+By] = FzBy[i/8];  Fz[i+Bz] = 0.0;
+    }
+
+  free(FxBy);  free(FyBz);  free(FzBx);
+  free(FxBz);  free(FyBx);  free(FzBy);
 }
 int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am)
 {
@@ -566,14 +636,14 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
   const double V3   =  vi*V2;
   const double V4   =  vi*V3;
 
-  const double K  =    P[rho]*h * (1./cs2-1.) * W4;
-  const double L  =  -(P[rho]*h +  b2/cs2)    * W2;
+  const double K  =    P[rho]*h * (1.0/cs2-1.0) * W4;
+  const double L  =  -(P[rho]*h +   b2/cs2)     * W2;
 
-  const double A4 =    K    - L        -   b0*b0;
-  const double A3 = -4*K*vi + L*vi*2   + 2*b0*bi;
-  const double A2 =  6*K*V2 + L*(1-V2) +   b0*b0 - bi*bi;
-  const double A1 = -4*K*V3 - L*vi*2   - 2*b0*bi;
-  const double A0 =    K*V4 + L*V2     +   bi*bi;
+  const double A4 =    K    - L          -   b0*b0;
+  const double A3 = -4*K*vi + L*vi*2     + 2*b0*bi;
+  const double A2 =  6*K*V2 + L*(1.0-V2) +   b0*b0 - bi*bi;
+  const double A1 = -4*K*V3 - L*vi*2     - 2*b0*bi;
+  const double A0 =    K*V4 + L*V2       +   bi*bi;
 
   new_QuarticEquation(A4,A3,A2,A1,A0);
   switch (lib_state.mode_quartic_solver)
@@ -669,7 +739,7 @@ int cons_to_prim_point(const double *U, double *P)
       const double W2 = W*W;
       const double W3 = W*W2;
 
-      const double Pre = (use_pres_floor) ? PRES_FLOOR : (D/W) * (Z/(D*W) - 1) * gamf;
+      const double Pre = (use_pres_floor) ? PRES_FLOOR : (D/W) * (Z/(D*W) - 1.0) * gamf;
 
       const double f1 = -S2  +  (Z+B2)*(Z+B2)*(W2-1)/W2 - (2*Z+B2)*BS2/Z2;      // eqn (84)
       const double f2 = -Tau +   Z+B2 - Pre - 0.5*B2/W2 -      0.5*BS2/Z2 - D;  // eqn (85)
@@ -713,8 +783,8 @@ int cons_to_prim_point(const double *U, double *P)
             {
               n_iter = 0;
               use_pres_floor = 1;
-              W = (est) ? sqrt(S2/(D*D) + 1) : W_guess;
-              Z = (est) ? D*W                : P[rho]*h_guess*W_guess*W_guess;
+              W = (est) ? sqrt(S2/(D*D) + 1.0) : W_guess;
+              Z = (est) ? D*W                  : P[rho]*h_guess*W_guess*W_guess;
             }
         }
       if (n_iter++ == NEWTON_MAX_ITER)
@@ -723,8 +793,8 @@ int cons_to_prim_point(const double *U, double *P)
             {
               n_iter = 0;
               use_pres_floor = 1;
-              W = (est) ? sqrt(S2/(D*D) + 1) : W_guess;
-              Z = (est) ? D*W                : P[rho]*h_guess*W_guess*W_guess;
+              W = (est) ? sqrt(S2/(D*D) + 1.0) : W_guess;
+              Z = (est) ? D*W                  : P[rho]*h_guess*W_guess*W_guess;
             }
           else
             {
@@ -736,7 +806,7 @@ int cons_to_prim_point(const double *U, double *P)
 
   double b0 = BS * W / Z;
   P[rho] =   D/W;
-  P[pre] =  (use_pres_floor) ? PRES_FLOOR : (D/W) * (Z/(D*W) - 1) * gamf;
+  P[pre] =  (use_pres_floor) ? PRES_FLOOR : (D/W) * (Z/(D*W) - 1.0) * gamf;
   P[vx ] =  (U[Sx] + b0*U[Bx]/W) / (Z+B2);
   P[vy ] =  (U[Sy] + b0*U[By]/W) / (Z+B2);
   P[vz ] =  (U[Sz] + b0*U[Bz]/W) / (Z+B2);
