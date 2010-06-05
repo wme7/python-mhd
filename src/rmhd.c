@@ -48,6 +48,10 @@ enum ReconstructMode { Reconstruct_PiecewiseConstant,
                        Reconstruct_PLM3Velocity,
                        Reconstruct_PLM4Velocity };
 
+enum SlopeLimiterMode { SlopeLimiter_Minmod,
+			SlopeLimiter_MonotizedCentral,
+			SlopeLimiter_HarmonicMean };
+
 enum QuarticSolverMode { QuarticSolver_Exact,
                          QuarticSolver_Approx1,
                          QuarticSolver_Approx2,
@@ -57,10 +61,12 @@ enum LibraryOperationMode { LibraryOperation_Alive,
                             LibraryOperation_Dead }
   libopstate = LibraryOperation_Dead;
 
+int quiet = 0;
 int dimension=1;
 int stride[4];
 double dx,dy,dz;
 double cons_to_prim_last_W;
+double (*slope_limiter)(double, double, double);
 
 struct LibraryState
 {
@@ -74,112 +80,27 @@ struct LibraryState
 
   int mode_riemann_solver;
   int mode_reconstruct;
+  int mode_slope_limiter;
   int mode_quartic_solver;
 } lib_state = { 0,0,0,
                 0.0,1.4,2.0,
                 RiemannSolver_HLL,
                 Reconstruct_PLM4Velocity,
+		SlopeLimiter_Minmod,
                 QuarticSolver_Exact };
-
-double *PrimitiveArray;
-double *FluxInterArray_x;
-double *FluxInterArray_y;
-double *FluxInterArray_z;
-double *lib_ux, *lib_uy, *lib_uz;
-
-int set_state(struct LibraryState state)
-{
-  lib_state = state;
-  return 0;
-}
-struct LibraryState get_state()
-{
-  return lib_state;
-}
-
-int quiet = 0;
-int initialize(double *P, int Nx, int Ny, int Nz,
-               double Lx, double Ly, double Lz, int q)
-{
-  quiet = q;
-  if (!quiet)
-    {
-      printf("\n\n\n");
-      printf("\t************** Initiating RMHD back-end **************\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t******************************************************\n");
-      printf("\n\n");
-      printf("Grid size     ............   (%  3d, %  3d, %  3d)\n", Nx,Ny,Nz);
-      printf("Domain size   ............   (%2.1f, %2.1f, %2.1f)\n", Lx,Ly,Lz);
-      printf("\n\n");
-    }
-
-  libopstate = LibraryOperation_Alive;
-
-  stride[0] = Nx*Ny*Nz*8;
-  stride[1] =    Ny*Nz*8;
-  stride[2] =       Nz*8;
-  stride[3] =          8;
-  dimension = 1;
-
-  int Ng = 2; // Number of guard cells required for the scheme
-
-  dx = Lx / (Nx-2*Ng);
-  dy = Ly / (Ny-2*Ng);
-  dz = Lz / (Nz-2*Ng);
-
-  PrimitiveArray = (double*) malloc(stride[0]*sizeof(double));
-  memcpy(PrimitiveArray, P, stride[0]*sizeof(double));
-
-  FluxInterArray_x = (double*) malloc(stride[0]*sizeof(double));
-  FluxInterArray_y = (double*) malloc(stride[0]*sizeof(double));
-  FluxInterArray_z = (double*) malloc(stride[0]*sizeof(double));
-
-  lib_ux = (double*) malloc(stride[0]/8*sizeof(double));
-  lib_uy = (double*) malloc(stride[0]/8*sizeof(double));
-  lib_uz = (double*) malloc(stride[0]/8*sizeof(double));
-
-  return 0;
-}
-int finalize()
-{
-  if (!quiet)
-    {
-      printf("\n\n\n");
-      printf("\t************** Finalizing RMHD back-end **************\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t*                                                    *\n");
-      printf("\t******************************************************\n");
-      printf("\n\n\n");
-    }
-
-  libopstate = LibraryOperation_Dead;
-  free(PrimitiveArray);
-
-  free(FluxInterArray_x);
-  free(FluxInterArray_y);
-  free(FluxInterArray_z);
-
-  free(lib_ux);
-  free(lib_uy);
-  free(lib_uz);
-
-  return 0;
-}
 
 
 /*------------------------------------------------------------------------------
  *
- * Function prototypes
+ * Function prototypes and static library variables
  *
  */
+
+static double *PrimitiveArray;
+static double *FluxInterArray_x;
+static double *FluxInterArray_y;
+static double *FluxInterArray_z;
+static double *lib_ux, *lib_uy, *lib_uz;
 
 int Fiph              (const double *P, double *F);
 int prim_to_cons_point(const double *P, double *U);
@@ -240,12 +161,26 @@ inline void invert_2by2_matrix(const double A[2][2], double B[2][2])
 }
 inline double plm_minmod(double ul, double u0, double ur)
 {
-  double a = lib_state.plm_theta * (u0 - ul);
-  double b =               0.5   * (ur - ul);
-  double c = lib_state.plm_theta * (ur - u0);
+  const double a = lib_state.plm_theta * (u0 - ul);
+  const double b =               0.5   * (ur - ul);
+  const double c = lib_state.plm_theta * (ur - u0);
 
   return 0.25*fabs(sign(a) + sign(b)) * (sign(a) + sign(c))*min3(fabs(a), fabs(b), fabs(c));
 }
+inline double MC_limiter(double ul, double u0, double ur)
+{
+  const double qp = ur - u0;
+  const double qm = u0 - ul;
+  const double si = 0.5*(sign(qp) + sign(qm));
+  return si * min3(2*fabs(qp), 2*fabs(qm), 0.5*(ur-ul));
+}
+inline double harmonic_mean(double ul, double u0, double ur)
+{
+  const double qp = ur - u0;
+  const double qm = u0 - ul;
+  return 2*max2(0,qp*qm) / (qp+qm);
+}
+
 /*------------------------------------------------------------------------------
  *
  * Functions describing adiabatic equation of state
@@ -266,6 +201,112 @@ inline double eos_cs2(double Rho, double Pre)
 }
 
 
+int set_state(struct LibraryState state)
+{
+  lib_state = state;
+
+  switch (lib_state.mode_slope_limiter)
+    {
+
+    case SlopeLimiter_Minmod:
+      slope_limiter = plm_minmod;
+      break;
+
+    case SlopeLimiter_MonotizedCentral:
+      slope_limiter = MC_limiter;
+      break;
+
+    case SlopeLimiter_HarmonicMean:
+      slope_limiter = harmonic_mean;
+      break;
+
+    default:
+      slope_limiter = plm_minmod;
+      break;
+    }
+
+  return 0;
+}
+struct LibraryState get_state()
+{
+  return lib_state;
+}
+
+int initialize(const double *P, int Nx, int Ny, int Nz,
+               double Lx, double Ly, double Lz, int q)
+{
+  quiet = q;
+  if (!quiet)
+    {
+      printf("\n\n\n");
+      printf("\t************** Initiating RMHD back-end **************\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t******************************************************\n");
+      printf("\n\n");
+      printf("Grid size     ............   (%3d, %3d, %3d)\n"      , Nx,Ny,Nz);
+      printf("Domain size   ............   (%2.1f, %2.1f, %2.1f)\n", Lx,Ly,Lz);
+      printf("\n\n");
+    }
+
+  libopstate = LibraryOperation_Alive;
+
+  stride[0] = Nx*Ny*Nz*8;
+  stride[1] =    Ny*Nz*8;
+  stride[2] =       Nz*8;
+  stride[3] =          8;
+  dimension = 1;
+
+  int Ng = 2; // Number of guard cells required for the scheme
+
+  dx = Lx / (Nx-2*Ng);
+  dy = Ly / (Ny-2*Ng);
+  dz = Lz / (Nz-2*Ng);
+
+  PrimitiveArray = (double*) malloc(stride[0]*sizeof(double));
+  memcpy(PrimitiveArray, P, stride[0]*sizeof(double));
+
+  FluxInterArray_x = (double*) malloc(stride[0]*sizeof(double));
+  FluxInterArray_y = (double*) malloc(stride[0]*sizeof(double));
+  FluxInterArray_z = (double*) malloc(stride[0]*sizeof(double));
+
+  lib_ux = (double*) malloc(stride[0]/8*sizeof(double));
+  lib_uy = (double*) malloc(stride[0]/8*sizeof(double));
+  lib_uz = (double*) malloc(stride[0]/8*sizeof(double));
+
+  return 0;
+}
+int finalize()
+{
+  if (!quiet)
+    {
+      printf("\n\n\n");
+      printf("\t************** Finalizing RMHD back-end **************\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t*                                                    *\n");
+      printf("\t******************************************************\n");
+      printf("\n\n\n");
+    }
+
+  libopstate = LibraryOperation_Dead;
+  free(PrimitiveArray);
+
+  free(FluxInterArray_x);
+  free(FluxInterArray_y);
+  free(FluxInterArray_z);
+
+  free(lib_ux);
+  free(lib_uy);
+  free(lib_uz);
+
+  return 0;
+}
 
 int hll_flux(const double *pl, const double *pr, double *U, double *F, double s)
 {
@@ -319,8 +360,8 @@ int reconstruct_use_3vel(const double *P0, double *Pl, double *Pr)
 
   for (i=0; i<8; ++i)
     {
-      Pr[i] = P0[S+i] - 0.5*plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
-      Pl[i] = P0[0+i] + 0.5*plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
+      Pr[i] = P0[S+i] - 0.5 * slope_limiter(P0[ 0+i], P0[S+i], P0[T+i]);
+      Pl[i] = P0[0+i] + 0.5 * slope_limiter(P0[-S+i], P0[0+i], P0[S+i]);
     }
 
   return 0;
@@ -343,18 +384,18 @@ int reconstruct_use_4vel(const double *P0,
   for (i=0; i<8; ++i)
     if (i==rho || i==pre || i==Bx || i==By || i==Bz)
       {
-        Pr[i] = P0[S+i] - 0.5*plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
-        Pl[i] = P0[0+i] + 0.5*plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
+        Pr[i] = P0[S+i] - 0.5 * plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
+        Pl[i] = P0[0+i] + 0.5 * plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
       }
 
-  const double ux_r = ux[U] - 0.5*plm_minmod(ux[ 0], ux[U], ux[V]);
-  const double ux_l = ux[0] + 0.5*plm_minmod(ux[-U], ux[0], ux[U]);
+  const double ux_r = ux[U] - 0.5 * slope_limiter(ux[ 0], ux[U], ux[V]);
+  const double ux_l = ux[0] + 0.5 * slope_limiter(ux[-U], ux[0], ux[U]);
 
-  const double uy_r = uy[U] - 0.5*plm_minmod(uy[ 0], uy[U], uy[V]);
-  const double uy_l = uy[0] + 0.5*plm_minmod(uy[-U], uy[0], uy[U]);
+  const double uy_r = uy[U] - 0.5 * slope_limiter(uy[ 0], uy[U], uy[V]);
+  const double uy_l = uy[0] + 0.5 * slope_limiter(uy[-U], uy[0], uy[U]);
 
-  const double uz_r = uz[U] - 0.5*plm_minmod(uz[ 0], uz[U], uz[V]);
-  const double uz_l = uz[0] + 0.5*plm_minmod(uz[-U], uz[0], uz[U]);
+  const double uz_r = uz[U] - 0.5 * slope_limiter(uz[ 0], uz[U], uz[V]);
+  const double uz_l = uz[0] + 0.5 * slope_limiter(uz[-U], uz[0], uz[U]);
 
   const double Wr = sqrt(1.0 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
   const double Wl = sqrt(1.0 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
@@ -445,10 +486,7 @@ int Fiph(const double *P, double *F)
     }
   for (i=S; i<stride[0]-S*2; i+=8)
     {
-      double Fl[8], Fr[8];
-      double Ul[8], Ur[8];
       double Pl[8], Pr[8];
-      double epl, epr, eml, emr;
       const double *P0 = &P[i];
 
       switch (lib_state.mode_reconstruct)
@@ -497,7 +535,7 @@ int constraint_transport_2d(double *Fx, double *Fy)
   double *FxBy = (double*) malloc(stride[0]/8*sizeof(double));
   double *FyBx = (double*) malloc(stride[0]/8*sizeof(double));
 
-  double *F, *G, *H;
+  double *F, *G;
   int i;
 
   const int sx=stride[1],sy=stride[2];
@@ -517,6 +555,8 @@ int constraint_transport_2d(double *Fx, double *Fy)
 
   free(FxBy);
   free(FyBx);
+
+  return 0;
 }
 int constraint_transport_3d(double *Fx, double *Fy, double *Fz)
 {
@@ -562,6 +602,8 @@ int constraint_transport_3d(double *Fx, double *Fy, double *Fz)
 
   free(FxBy);  free(FyBz);  free(FzBx);
   free(FxBz);  free(FyBx);  free(FzBy);
+
+  return 0;
 }
 int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am)
 {
@@ -578,9 +620,7 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
   const double e    =   eos_sie(P[rho], P[pre]);
   const double p    =   P[pre];
   const double h    =   1.0 + e + P[pre]/P[rho];
-  const double e_   =   e + 0.5 * b2 / P[rho];
   const double p_   =   p + 0.5 * b2;
-  const double h_   =   1.0 + e_ + p_ / P[rho];
 
   switch (dimension)
     {

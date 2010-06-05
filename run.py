@@ -46,6 +46,35 @@ def compare_reconstruct():
 
 
 
+def compare_limiter():
+
+    from pylab import show
+    from rmhd import _lib, LibraryState, visual
+    from rmhd.driver import ProblemDriver
+
+    driver = ProblemDriver(N=(512,), L=(1.0,))
+    problem = RMHDShockTube1()
+
+    stateA  = LibraryState(mode_reconstruct=0)
+    state0  = LibraryState(mode_slope_limiter=0)
+    state1  = LibraryState(mode_slope_limiter=1)
+    state2  = LibraryState(mode_slope_limiter=2)
+
+    run_args = {'CFL':0.5, 'tfinal':0.2}
+
+    PA = driver.run(_lib, stateA, problem, **run_args)
+    P0 = driver.run(_lib, state0, problem, **run_args)
+    P1 = driver.run(_lib, state1, problem, **run_args)
+    P2 = driver.run(_lib, state2, problem, **run_args)
+
+    visual.shocktube(PA, label="no reconstruct", linestyle='-', marker='None')
+    visual.shocktube(P0, label="minmod", linestyle='--', mfc='None')
+    visual.shocktube(P1, label="MC", linestyle='-.', mfc='None')
+    visual.shocktube(P2, label="harmonic mean", linestyle=':', lw=3, marker='None')
+    visual.show()
+
+
+
 def compare_riemann_solver():
 
     from rmhd import LibraryState, visual, _lib
@@ -279,5 +308,6 @@ if __name__ == "__main__":
 
     #compare_riemann_solver()
     #compare_reconstruct()
+    compare_limiter()
     #compare_quartic()
-    spherical_blast_3d()
+    #spherical_blast_3d()

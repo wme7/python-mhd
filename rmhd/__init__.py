@@ -36,6 +36,7 @@ class LibraryState(Structure):
 
   int mode_riemann_solver;
   int mode_reconstruct;
+  int mode_slope_limiter;
   int mode_quartic_solver;"""
 
     _fields_ = [(x.split()[1], _type_dict[x.split()[0]])
@@ -54,6 +55,7 @@ class LibraryState(Structure):
 
         self.mode_riemann_solver       = 0 # HLL approximate solver
         self.mode_reconstruct          = 2 # PLM on 4-velocity
+        self.mode_slope_limiter        = 0 # Minmod limiter
         self.mode_quartic_solver       = 0 # Exact solver
 
         for k in kwargs:

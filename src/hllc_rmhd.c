@@ -33,7 +33,7 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
 
-int hllc_set_dimension(int d) { dimension = d; }
+int hllc_set_dimension(int d) { dimension = d; return 0; }
 int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s)
 {
   int i;
@@ -42,9 +42,9 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
   double Pl[8], Pr[8];
   double Fl[8], Fr[8];
 
-  int B1,B2,B3;
-  int S1,S2,S3;
-  int v1,v2,v3;
+  int B1=0,B2=0,B3=0;
+  int S1=0,S2=0,S3=0;
+  int v1=0,v2=0,v3=0;
 
   switch (dimension)
     {
