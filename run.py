@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 
-
 def sr_shocktube():
 
     from rmhd import LibraryState, visual, _lib, riemann
@@ -195,41 +194,52 @@ def cylindrical_blast():
 
 
 
-def symmetry_test1():
+def symmetry_test():
+
+    """
+    This test demonstrates an issue in the library where reconstruction on
+    4-velocities results in some unexpected asymmetry, in a model with
+    initial conditions having mirror symmetry across the diagonal.
+    """
 
     from rmhd import _lib, LibraryState
     from rmhd.driver import ProblemDriver
+    from pylab import imshow, colorbar, show, subplot, title
+    from numpy import flipud
 
     driver = ProblemDriver(N=(32,32), L=(2,2))
     problem = SRQuadrantA()
 
-    states = [LibraryState(mode_reconstruct    = 1,
-                           mode_quartic_solver = 0),
+    quartic     = [0,3,0,3]
+    reconstruct = [1,1,2,2]
+    names       = ['3vel, quartic exact', '3vel, quartic none',
+                   '4vel, quartic exact', '4vel, quartic none']
+    runnum      = range(1,5)
+    run_args    = {'RK_order': 3, 'CFL': 0.2, 'tfinal': 0.2}
 
-              LibraryState(mode_reconstruct    = 1,
-                           mode_quartic_solver = 3),
+    def do_sym(P, name):
 
-              LibraryState(mode_reconstruct    = 2,
-                           mode_quartic_solver = 0),
+        tr = lambda x: flipud(x.T)
 
-              LibraryState(mode_reconstruct    = 2,
-                           mode_quartic_solver = 3)]
-
-    run_args = {'name': "symmetry test",
-                'RK_order': 3, 'CFL': 0.2, 'tfinal': 0.2}
-
-    for n,state in enumerate(states):
-
-        state.plm_theta = 2.0
-        P = driver.run(_lib, state, problem, **run_args)
-        P.dump('quadrant%d.np' % (n+1))
-
-    from os import system
-    system('./symmetry.py')
+        Nx, Ny, Nq = P.shape
+        q = P[2:Nx-2,2:Ny-2,0]
+        imshow(tr((q-q.T)/(q+q.T)))
+        colorbar()
+        title(name)
 
 
+    for num,n,q,r in zip(runnum, names, quartic, reconstruct):
 
-def symmetry_test2():
+        state = LibraryState(mode_quartic_solver=q, mode_reconstruct=r)
+        P = driver.run(_lib, state, problem, name=n, **run_args)
+
+        subplot(2,2,num)
+        do_sym(P, n)
+
+    show()
+
+
+def quadrant_problem():
 
     from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
@@ -277,23 +287,53 @@ def spherical_blast_3d():
 
     from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
-    from pylab import figure, savefig, imshow, show, colorbar
 
-    noB = {'B':[0.5,0,0]}
+    B = {'B':[0.8,0,0]}
 
-    problem = RMHDCylindricalA( I=noB, O=noB )
-    driver = ProblemDriver(N=(64,64,64), L=(2,2,2))
-    state = LibraryState()
+    problem = RMHDCylindricalA( I=B, O=B )
+    driver = ProblemDriver(N=(32,32,32), L=(2,2,2))
+    state = LibraryState(mode_riemann_solver=1, mode_reconstruct=1)
 
-    run_args = {'RK_order': 3, 'CFL': 0.3, 'tfinal': 0.4}
+    run_args = {'RK_order': 3, 'CFL': 0.05, 'tfinal': 0.3}
     P = driver.run(_lib, state, problem, **run_args)
+    visual.four_pane_2d(P[:,:,16], extent=[-1,1,-1,1])
+    visual.show()
 
-    div = cross_stencil_div_3d(P[:,:,:,5],P[:,:,:,6],P[:,:,:,7])
 
-    #visual.four_pane_2d(P[:,:,32], extent=[-1,1,-1,1])
-    imshow(div[:,:,32])
-    colorbar()
-    show()
+
+def analyze_failed_state(pickle_name):
+    
+    from pickle import load
+    from numpy import zeros_like
+    from rmhd import _lib, LibraryState
+
+
+    e = load(open(pickle_name))
+
+    P = e.SurroundingBlock
+    F = zeros_like(P)
+
+    state = LibraryState(mode_riemann_solver=1, mode_reconstruct=1)
+
+    _lib.set_state(state)
+    _lib.initialize(P, 5,5,5, 1.0,1.0,1.0, 0)
+
+    _lib.set_dimension(1)
+    _lib.Fiph(P,F)
+    print "Fx:", F[1,1,1], F[2,2,2]
+
+    _lib.set_dimension(2)
+    _lib.Fiph(P,F)
+    print "Fy:", F[1,1,1], F[2,2,2]
+
+    _lib.set_dimension(3)
+    _lib.Fiph(P,F)
+    print "Fz:", F[1,1,1], F[2,2,2]
+
+    _lib.finalize()
+
+
+
 
 
 if __name__ == "__main__":
@@ -301,13 +341,23 @@ if __name__ == "__main__":
     from rmhd.testbench import *
     from pylab import figure, zeros, imshow, show
 
-    #sr_shocktube()
-    #riemann_wave_pattern()
-    #cylindrical_blast()
-    #symmetry_test1()
+    from optparse import OptionParser
 
-    #compare_riemann_solver()
-    #compare_reconstruct()
-    compare_limiter()
-    #compare_quartic()
-    #spherical_blast_3d()
+    parser = OptionParser()
+    opt, args = parser.parse_args()
+
+    if len(args) and args[0].endswith('.fail'):
+        analyze_failed_state(args[0])
+
+    else:
+        #sr_shocktube()
+        #riemann_wave_pattern()
+        #cylindrical_blast()
+        #symmetry_test()
+
+        #compare_riemann_solver()
+        #compare_reconstruct()
+        #compare_limiter()
+        #compare_quartic()
+        spherical_blast_3d()
+

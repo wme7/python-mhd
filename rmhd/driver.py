@@ -1,5 +1,15 @@
 
 
+class LibraryFailure:
+
+    def __init__(self, U, P, surround, index):
+
+        self.FailedConsState = U
+        self.FailedPrimState = P
+        self.FailedIndexLocation = index
+        self.SurroundingBlock = surround
+
+
 class ProblemDriver:
 
 
@@ -9,14 +19,18 @@ class ProblemDriver:
         self.L = L
         self.Ng = 2
         self.failures = 0
+        self.raise_on_failure = True
 
 
     def main_loop(self, U):
+
+        from numpy import zeros_like
 
         dUdt = { 1: self.dUdt_1d, 2: self.dUdt_2d, 3: self.dUdt_3d }[len(self.N)]
         t   = 0.0
         dt  = 1e-9
         n_cycle = 0
+        self.last_good_P = zeros_like(U)
 
         from time import time
         while t < self.tfinal:
@@ -24,18 +38,28 @@ class ProblemDriver:
             n_cycle += 1
             start = time()
 
-            if self.RK_order is 1:
-                U += dt*dUdt(U)
+            self.lib.cons_to_prim_array(U, self.last_good_P, U.size/8)
+            try:
+                if self.RK_order is 1:
+                    U += dt*dUdt(U)
 
-            if self.RK_order is 2:
-                L1 =    dUdt(U);
-                U += dt*dUdt(U + 0.5*dt*L1);
+                if self.RK_order is 2:
+                    L1 =    dUdt(U);
+                    U += dt*dUdt(U + 0.5*dt*L1);
 
-            elif self.RK_order is 3:
+                elif self.RK_order is 3:
+                    U1 =      U +                  dt * dUdt(U )
+                    U1 = 3./4*U + 1./4*U1 + 1./4 * dt * dUdt(U1)
+                    U  = 1./3*U + 2./3*U1 + 2./3 * dt * dUdt(U1)
 
-                U1 =      U +                  dt * dUdt(U )
-                U1 = 3./4*U + 1./4*U1 + 1./4 * dt * dUdt(U1)
-                U  = 1./3*U + 2./3*U1 + 2./3 * dt * dUdt(U1)
+            except LibraryFailure, e:
+                print "\n\n"
+                print "Caught exception", e.__class__, "at index", e.FailedIndexLocation
+                from os import system
+                from pickle import dump
+                system('mkdir -p failures')
+                dump(e, open('failures/FailedState.fail', 'w'))
+                break
 
             t += dt
             step_time = time()-start
@@ -62,6 +86,7 @@ class ProblemDriver:
 
         return P
 
+
     def run_1d(self, lib, state, problem, RK_order=2, CFL=0.5, tfinal=0.2):
 
         from numpy import zeros
@@ -87,7 +112,7 @@ class ProblemDriver:
         self.RK_order = RK_order
         self.min_dx = dx
         self.quiet = True
-        U = self.main_loop(U.copy())
+        U = self.main_loop(U)
 
         lib.cons_to_prim_array(U,P,U.size/8)
         lib.finalize()
@@ -161,10 +186,59 @@ class ProblemDriver:
         return P
 
 
+    def catch_failure_1d(self):
+
+        from numpy import zeros
+
+        if self.raise_on_failure:
+            U,P = zeros(8), zeros(8)
+
+            Nx, = self.N
+            i = self.lib.get_failed_state(U,P)
+            raise LibraryFailure(U, P, self.last_good_P[i-2:i+3,:], (i,))
+
+        else:
+            self.failures += 1
+
+    def catch_failure_2d(self):
+
+        from numpy import zeros
+
+        if self.raise_on_failure:
+            U,P = zeros(8), zeros(8)
+
+            Nx,Ny = self.N
+            I = self.lib.get_failed_state(U,P)
+            i = (I - 0   )/(Ny)
+            j = (I - i*Ny)
+
+            raise LibraryFailure(U, P, self.last_good_P[i-2:i+3,j-2:j+3,:], (i,j))
+
+        else:
+            self.failures += 1
+
+    def catch_failure_3d(self):
+
+        from numpy import zeros
+
+        if self.raise_on_failure:
+            U,P = zeros(8), zeros(8)
+
+            Nx,Ny,Nz = self.N
+            I = self.lib.get_failed_state(U,P)
+            i = (I - 0             )/(Ny*Nz)
+            j = (I - i*Ny*Nz       )/(Nz)
+            k = (I - i*Ny*Nz - j*Nz)
+
+            raise LibraryFailure(U, P, self.last_good_P[i-2:i+3,j-2:j+3,k-2:k+3,:], (i,j,k))
+
+        else:
+            self.failures += 1
+
 
     def dUdt_1d(self, U):
 
-        from numpy import zeros_like
+        from numpy import zeros, zeros_like
         L = zeros_like(U)
 
         Ng = self.Ng
@@ -173,7 +247,7 @@ class ProblemDriver:
         U[ 0:Ng,   ] = U[   Ng  ] # Boundary conditions
         U[Nx-Ng:Nx,] = U[Nx-Ng-1]
 
-        self.failures += self.lib.dUdt_1d(U,L)
+        if self.lib.dUdt_1d(U,L): self.catch_failure_1d()
         return L
 
 
@@ -192,7 +266,7 @@ class ProblemDriver:
             U[:,   i  ] = U[:,   Ng  ]
             U[:,Ny-i-1] = U[:,Ny-Ng-1]
 
-        self.failures += self.lib.dUdt_2d(U,L)
+        if self.lib.dUdt_2d(U,L): self.catch_failure_2d()
         return L
 
 
@@ -214,6 +288,6 @@ class ProblemDriver:
             U[:,:,   i  ,:] = U[:,:,   Ng  ,:]
             U[:,:,Nz-i-1,:] = U[:,:,Nz-Ng-1,:]
 
-        self.failures += self.lib.dUdt_3d(U,L)
+        if self.lib.dUdt_3d(U,L): self.catch_failure_3d()
         return L
 

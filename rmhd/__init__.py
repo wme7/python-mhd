@@ -1,7 +1,7 @@
 
 
-from ctypes import CDLL, Structure, c_double, c_int
-from numpy import float64, array, zeros, roll
+from ctypes import CDLL, POINTER, Structure, c_double, c_int
+from numpy import float64
 from numpy.ctypeslib import ndpointer
 from sys import path
 from os.path import abspath, dirname
@@ -78,20 +78,18 @@ _lib.prim_to_cons_array.argtypes = [const_array, write_array, c_int]
 _lib.cons_to_prim_array.argtypes = [const_array, write_array, c_int]
 _lib.prim_to_cons_point.argtypes = [const_array, write_array]
 _lib.cons_to_prim_point.argtypes = [const_array, write_array]
+
+
 _lib.hll_flux          .argtypes = [const_array]*2 + [write_array]*2 + [c_double]
 _lib.hllc_flux         .argtypes = [const_array]*2 + [write_array]*2 + [c_double]
-
-_lib.initialize        .restype = c_int
-_lib.finalize          .restype = c_int
-_lib.dUdt_1d           .restype = c_int
-_lib.dUdt_2d           .restype = c_int
-_lib.dUdt_3d           .restype = c_int
-_lib.Fiph              .restype = c_int
-_lib.prim_to_cons_array.restype = c_int
-_lib.cons_to_prim_array.restype = c_int
-_lib.prim_to_cons_point.restype = c_int
-_lib.cons_to_prim_point.restype = c_int
-_lib.hllc_flux         .restype = c_int
+_lib.set_dimension     .argtypes = [c_int]
 
 _lib.set_state.argtypes = [ LibraryState ]
 _lib.get_state.restype  =   LibraryState
+
+_lib.get_failed_state.argtypes = [write_array]*2
+
+
+# Access to the library's internal quartic solver
+_lib.new_QuarticEquation.argtypes    = [c_double]*5
+_lib.solve_quartic_equation.argtypes = [POINTER(c_double)]*4 + [POINTER(c_int)]*2

@@ -68,6 +68,11 @@ double dx,dy,dz;
 double cons_to_prim_last_W;
 double (*slope_limiter)(double, double, double);
 
+double FailedConsState[8];
+double FailedPrimState[8];
+int FailedIndexLocation;
+int return_on_failure=1;
+
 struct LibraryState
 {
   int cons_to_prim_iter;
@@ -200,7 +205,12 @@ inline double eos_cs2(double Rho, double Pre)
   return lib_state.adiabatic_gamma * Pre / (Pre + Rho + Rho*e);
 }
 
-
+int set_dimension(int d)
+{
+  dimension = d;
+  hllc_set_dimension(d);
+  return 0;
+}
 int set_state(struct LibraryState state)
 {
   lib_state = state;
@@ -231,7 +241,12 @@ struct LibraryState get_state()
 {
   return lib_state;
 }
-
+int get_failed_state(double *U, double *P)
+{
+  memcpy(U, FailedConsState, 8*sizeof(double));
+  memcpy(P, FailedPrimState, 8*sizeof(double));
+  return FailedIndexLocation;
+}
 int initialize(const double *P, int Nx, int Ny, int Nz,
                double Lx, double Ly, double Lz, int q)
 {
@@ -258,7 +273,6 @@ int initialize(const double *P, int Nx, int Ny, int Nz,
   stride[1] =    Ny*Nz*8;
   stride[2] =       Nz*8;
   stride[3] =          8;
-  dimension = 1;
 
   int Ng = 2; // Number of guard cells required for the scheme
 
@@ -416,7 +430,7 @@ int dUdt_1d(const double *U, double *L)
 
   failures = cons_to_prim_array(U,P,stride[0]/8);
 
-  dimension = 1;
+  set_dimension(1);
   Fiph(P,F);
 
   S = stride[dimension];
@@ -438,8 +452,8 @@ int dUdt_2d(const double *U, double *L)
 
   int failures = cons_to_prim_array(U,P,stride[0]/8);
 
-  dimension = 1;  Fiph(P,F);
-  dimension = 2;  Fiph(P,G);
+  set_dimension(1);  Fiph(P,F);
+  set_dimension(2);  Fiph(P,G);
 
   constraint_transport_2d(F,G);
 
@@ -462,9 +476,9 @@ int dUdt_3d(const double *U, double *L)
   int i,sx=stride[1],sy=stride[2],sz=stride[3];
   int failures = cons_to_prim_array(U,P,stride[0]/8);
 
-  dimension = 1;  Fiph(P,F);
-  dimension = 2;  Fiph(P,G);
-  dimension = 3;  Fiph(P,H);
+  set_dimension(1);  Fiph(P,F);
+  set_dimension(2);  Fiph(P,G);
+  set_dimension(3);  Fiph(P,H);
 
   constraint_transport_3d(F,G,H);
 
@@ -476,6 +490,9 @@ int dUdt_3d(const double *U, double *L)
 }
 int Fiph(const double *P, double *F)
 {
+  if (libopstate == LibraryOperation_Dead)
+    return 1;
+
   const int S = stride[dimension];
   hllc_set_dimension(dimension);
 
@@ -504,6 +521,8 @@ int Fiph(const double *P, double *F)
         case Reconstruct_PLM4Velocity:
           reconstruct_use_4vel(P0, &lib_ux[i/8], &lib_uy[i/8], &lib_uz[i/8], Pl, Pr);
           break;
+	  // WARNING! this option will only work if cons_to_prim_array was 
+	  // called immediately prior. Should find a way around this...
 
         default:
           reconstruct_use_3vel(P0, Pl, Pr);
@@ -838,6 +857,8 @@ int cons_to_prim_point(const double *U, double *P)
             }
           else
             {
+	      memcpy(FailedConsState, U, 8*sizeof(double));
+	      memcpy(FailedPrimState, P, 8*sizeof(double));
               return 1;
             }
         }
@@ -874,7 +895,12 @@ int cons_to_prim_array(const double *U, double *P, int N)
       const double *Ui = &U[i];
       double       *Pi = &P[i];
 
-      failures += cons_to_prim_point(Ui,Pi);
+      if (cons_to_prim_point(Ui,Pi))
+	{
+	  FailedIndexLocation = i/8;
+	  if (return_on_failure) return 1;
+	  else failures++;
+	}
 
       if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity &&
           libopstate == LibraryOperation_Alive)

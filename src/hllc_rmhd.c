@@ -70,20 +70,19 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
   memcpy(Pl,pl,8*sizeof(double));
   memcpy(Pr,pr,8*sizeof(double));
 
+  Pl[B1] = Pr[B1] = 0.5*(Pl[B1] + Pr[B1]); // Must have no normal jump in B
+
   prim_to_cons_point(Pl,Ul);
   prim_to_cons_point(Pr,Ur);
 
   rmhd_flux_and_eval(Ul, Pl, Fl, &epl, &eml);
   rmhd_flux_and_eval(Ur, Pr, Fr, &epr, &emr);
 
-  double ap = (epl>epr) ? epl : epr;
-  double am = (eml<emr) ? eml : emr;
-
   Ul[tau] += Ul[ddd];  Fl[tau] += Fl[ddd]; // Change in convention of total energy
   Ur[tau] += Ur[ddd];  Fr[tau] += Fr[ddd];
 
-  Ul[B1] = Ur[B1] = 0.5*(Ul[B1] + Ur[B1]); // Must have no normal jump in B
-  Fl[B1] = Fr[B1] = 0.5*(Fl[B1] + Fr[B1]);
+  double ap = (epl>epr) ? epl : epr;
+  double am = (eml<emr) ? eml : emr;
 
   double F_hll[8], U_hll[8];
   for (i=0; i<8; ++i)
