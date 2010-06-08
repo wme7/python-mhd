@@ -18,6 +18,26 @@ def sr_shocktube():
     visual.show()
 
 
+def compare_mlines_ctu():
+
+
+    from pylab import show
+    from rmhd import _lib, LibraryState, visual
+    from rmhd.driver import ProblemDriver
+
+    driver = ProblemDriver(N=(128,), L=(1.0,))
+    problem = RMHDShockTube2()
+    state = LibraryState()
+
+    run_args = {'CFL':0.5, 'tfinal':0.2}
+
+    P0 = driver.run(_lib, state, problem, name='method of lines, RK3', RK_order=3, **run_args)
+    P1 = driver.run(_lib, state, problem, name='CTU, first order    ', RK_order=4, **run_args)
+
+    visual.shocktube(P0, label='method of lines, RK3', linestyle='--', mfc='None')
+    visual.shocktube(P1, label='CTU, first order    ', linestyle='-.', mfc='None')
+    visual.show()
+
 
 def compare_reconstruct():
 
@@ -34,9 +54,9 @@ def compare_reconstruct():
 
     run_args = {'CFL':0.5, 'tfinal':0.2}
 
-    P0 = driver.run(_lib, state0, problem, **run_args)
-    P1 = driver.run(_lib, state1, problem, **run_args)
-    P2 = driver.run(_lib, state2, problem, **run_args)
+    P0 = driver.run(_lib, state0, problem, name='piecewise constant', **run_args)
+    P1 = driver.run(_lib, state1, problem, name='PLM on 3-velocity ', **run_args)
+    P2 = driver.run(_lib, state2, problem, name='PLM on 4-velocity ', **run_args)
 
     visual.shocktube(P0, label="Piecewise Constant", linestyle='--', mfc='None')
     visual.shocktube(P1, label="PLM 3-velocity", linestyle='-.', mfc='None')
@@ -52,7 +72,7 @@ def compare_limiter():
     from rmhd.driver import ProblemDriver
 
     driver = ProblemDriver(N=(512,), L=(1.0,))
-    problem = RMHDShockTube1()
+    problem = RMHDShockTube2()
 
     stateA  = LibraryState(mode_reconstruct=0)
     state0  = LibraryState(mode_slope_limiter=0)
@@ -199,7 +219,9 @@ def symmetry_test():
     """
     This test demonstrates an issue in the library where reconstruction on
     4-velocities results in some unexpected asymmetry, in a model with
-    initial conditions having mirror symmetry across the diagonal.
+    initial conditions having mirror symmetry across the diagonal. Note that
+    the effect is either fixed or 'masked' when sqrtf is used in place of
+    sqrt in 4-velocity reconstruction function.
     """
 
     from rmhd import _lib, LibraryState
@@ -248,7 +270,7 @@ def quadrant_problem():
     probs = [SRQuadrantA(), SRQuadrantB()]
     names = ['A', 'B']
 
-    driver = ProblemDriver(N=(256,256), L=(2,2))
+    driver = ProblemDriver(N=(32,32), L=(2,2))
     state = LibraryState()
 
     run_args = {'RK_order': 2, 'CFL': 0.6, 'tfinal': 0.8}
@@ -284,7 +306,6 @@ def cross_stencil_div_3d(fx,fy,fz,dx=1,dy=1,dz=1):
 
 def spherical_blast_3d():
 
-
     from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
 
@@ -302,7 +323,7 @@ def spherical_blast_3d():
 
 
 def analyze_failed_state(pickle_name):
-    
+
     from pickle import load
     from numpy import zeros_like
     from rmhd import _lib, LibraryState
@@ -353,11 +374,12 @@ if __name__ == "__main__":
         #sr_shocktube()
         #riemann_wave_pattern()
         #cylindrical_blast()
+        #quadrant_problem()
+        #spherical_blast_3d()
         #symmetry_test()
 
         #compare_riemann_solver()
-        compare_reconstruct()
+        #compare_reconstruct()
         #compare_limiter()
         #compare_quartic()
-        #spherical_blast_3d()
-
+        compare_mlines_ctu()

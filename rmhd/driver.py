@@ -52,6 +52,16 @@ class ProblemDriver:
                     U1 = 3./4*U + 1./4*U1 + 1./4 * dt * dUdt(U1)
                     U  = 1./3*U + 2./3*U1 + 2./3 * dt * dUdt(U1)
 
+                elif self.RK_order is 4:
+                    Ng = self.Ng
+                    Nx, = self.N
+
+                    U[ 0:Ng   ] = U[   Ng  ] # Boundary conditions
+                    U[Nx-Ng:Nx] = U[Nx-Ng-1]
+
+                    self.lib.advance_U_ctu_1d(U,dt)
+
+
             except LibraryFailure, e:
                 print "\n\n"
                 print "Caught exception", e.__class__, "at index", e.FailedIndexLocation
@@ -200,6 +210,7 @@ class ProblemDriver:
         else:
             self.failures += 1
 
+
     def catch_failure_2d(self):
 
         from numpy import zeros
@@ -216,6 +227,7 @@ class ProblemDriver:
 
         else:
             self.failures += 1
+
 
     def catch_failure_3d(self):
 
@@ -244,8 +256,8 @@ class ProblemDriver:
         Ng = self.Ng
         Nx, = self.N
 
-        U[ 0:Ng,   ] = U[   Ng  ] # Boundary conditions
-        U[Nx-Ng:Nx,] = U[Nx-Ng-1]
+        U[ 0:Ng   ] = U[   Ng  ] # Boundary conditions
+        U[Nx-Ng:Nx] = U[Nx-Ng-1]
 
         if self.lib.dUdt_1d(U,L): self.catch_failure_1d()
         return L

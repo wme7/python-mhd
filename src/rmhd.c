@@ -416,17 +416,15 @@ int dUdt_1d(const double *U, double *L)
 
   double *P = PrimitiveArray;
   double *F = FluxInterArray_x;
-  int failures,S,i;
 
-  failures = cons_to_prim_array(U,P,stride[0]/8);
+  int i,sx=stride[1];
+  int failures = cons_to_prim_array(U,P,stride[0]/8);
 
-  set_dimension(1);
-  Fiph(P,F);
+  set_dimension(1);  Fiph(P,F);
 
-  S = stride[dimension];
-  for (i=S; i<stride[0]; ++i)
+  for (i=sx; i<stride[0]; ++i)
     {
-      L[i] = -(F[i]-F[i-S])/dx;
+      L[i] = -(F[i]-F[i-sx])/dx;
     }
   return failures;
 }
@@ -438,8 +436,8 @@ int dUdt_2d(const double *U, double *L)
   double *P = PrimitiveArray;
   double *F = FluxInterArray_x;
   double *G = FluxInterArray_y;
-  int i,sx=stride[1],sy=stride[2];
 
+  int i,sx=stride[1],sy=stride[2];
   int failures = cons_to_prim_array(U,P,stride[0]/8);
 
   set_dimension(1);  Fiph(P,F);
@@ -696,6 +694,8 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, 
       break;
     }
 
+  if (ap == 0 && am == 0) return 0; // User may skip eigenvalue calculation
+
   const double W4   =  W2*W2;
   const double cs2  =  eos_cs2(P[rho],P[pre]);
   const double V2   =  vi*vi;
@@ -945,4 +945,55 @@ int prim_to_cons_array(const double *P, double *U, int N)
       prim_to_cons_point(&P[i], &U[i]);
     }
   return 0;
+}
+
+
+
+int advance_U_ctu_1d(double *U, double dt)
+{
+  if (libopstate == LibraryOperation_Dead)
+    return 1;
+
+  double *P = PrimitiveArray;
+  double *F = FluxInterArray_x;
+
+  int i,sx=stride[1];
+  int failures = cons_to_prim_array(U,P,stride[0]/8);
+
+  set_dimension(1);
+
+  double *Ux = (double*) malloc(stride[0]*sizeof(double));
+
+  for (i=0; i<stride[0]; i+=8)
+    { // BC's expected to be set, all fluxes are valid
+      rmhd_flux_and_eval(&U[i], &P[i], &F[i], 0, 0);
+    }
+
+  for (i=sx; i<stride[0]-sx; ++i)
+    { // Outermost 1 cells are not updated
+      Ux[i] = U[i] - 0.5*(dt/dx)*(F[i+sx]-F[i-sx]);
+    }
+
+  failures += cons_to_prim_array(Ux,P,stride[0]/8);
+
+  for (i=0; i<stride[0]-sx; i+=8)
+    {
+      double Pl[8], Pr[8];
+      const double *P0 = &P[i];
+
+      memcpy(Pl, P0   , 8*sizeof(double));
+      memcpy(Pr, P0+sx, 8*sizeof(double));
+
+      double U_star[8];
+      hll_flux(Pl, Pr, U_star, &F[i], 0.0);
+    }
+
+  for (i=sx; i<stride[0]; ++i)
+    {
+      U[i] -= (dt/dx)*(F[i]-F[i-sx]);
+    }
+
+  free(Ux);
+
+  return failures;
 }
