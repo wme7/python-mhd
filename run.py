@@ -25,9 +25,9 @@ def compare_mlines_ctu():
     from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
 
-    driver = ProblemDriver(N=(128,), L=(1.0,))
+    driver = ProblemDriver(N=(1024,), L=(1.0,))
     problem = RMHDShockTube2()
-    state = LibraryState()
+    state = LibraryState(plm_theta=2.0, mode_slope_limiter=0)
 
     run_args = {'CFL':0.5, 'tfinal':0.2}
 
@@ -77,19 +77,19 @@ def compare_limiter():
     stateA  = LibraryState(mode_reconstruct=0)
     state0  = LibraryState(mode_slope_limiter=0)
     state1  = LibraryState(mode_slope_limiter=1)
-    state2  = LibraryState(mode_slope_limiter=2)
+    #state2  = LibraryState(mode_slope_limiter=2)
 
     run_args = {'CFL':0.5, 'tfinal':0.2}
 
     PA = driver.run(_lib, stateA, problem, **run_args)
     P0 = driver.run(_lib, state0, problem, **run_args)
     P1 = driver.run(_lib, state1, problem, **run_args)
-    P2 = driver.run(_lib, state2, problem, **run_args)
+    #P2 = driver.run(_lib, state2, problem, **run_args)
 
     visual.shocktube(PA, label="no reconstruct", linestyle='-', marker='None')
     visual.shocktube(P0, label="minmod", linestyle='--', mfc='None')
     visual.shocktube(P1, label="MC", linestyle='-.', mfc='None')
-    visual.shocktube(P2, label="harmonic mean", linestyle=':', lw=3, marker='None')
+    #visual.shocktube(P2, label="harmonic mean", linestyle=':', lw=3, marker='None')
     visual.show()
 
 

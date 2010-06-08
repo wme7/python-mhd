@@ -167,7 +167,6 @@ inline double plm_minmod(double ul, double u0, double ur)
   const double a = lib_state.plm_theta * (u0 - ul);
   const double b =               0.5   * (ur - ul);
   const double c = lib_state.plm_theta * (ur - u0);
-
   return 0.25*fabs(sign(a) + sign(b)) * (sign(a) + sign(c))*min3(fabs(a), fabs(b), fabs(c));
 }
 inline double MC_limiter(double ul, double u0, double ur)
@@ -175,13 +174,13 @@ inline double MC_limiter(double ul, double u0, double ur)
   const double qp = ur - u0;
   const double qm = u0 - ul;
   const double si = 0.5*(sign(qp) + sign(qm));
-  return si * min3(2*fabs(qp), 2*fabs(qm), 0.5*(ur-ul));
+  return si * min3(2*fabs(qp), 2*fabs(qm), 0.5*fabs(ur-ul));
 }
 inline double harmonic_mean(double ul, double u0, double ur)
 {
   const double qp = ur - u0;
   const double qm = u0 - ul;
-  return 2*max2(0,qp*qm) / (qp+qm);
+  return (sign(qp)==sign(qm)) ? 2*qp*qm/(ur-ul) : 0;
 }
 
 /*------------------------------------------------------------------------------
@@ -994,6 +993,73 @@ int advance_U_ctu_1d(double *U, double dt)
     }
 
   free(Ux);
+
+  return failures;
+}
+
+int advance_U_ctu_1d_2nd_order(double *U, double dt)
+{
+  if (libopstate == LibraryOperation_Dead)
+    return 1;
+
+  double *F = FluxInterArray_x;
+  double *P = PrimitiveArray;
+
+  int i,j,sx=stride[1];
+  int failures = cons_to_prim_array(U,P,stride[0]/8);
+
+  set_dimension(1);
+
+  double *Ux   = (double*) malloc(stride[0]*sizeof(double));
+  double *dPdx = (double*) malloc(stride[0]*sizeof(double));
+
+  for (i=sx; i<stride[0]-sx; ++i)
+    {
+      dPdx[i] = slope_limiter(P[i-sx], P[i], P[i+sx]);
+    }
+  for (i=0; i<stride[0]; i+=8)
+    {
+      double PL[8], PR[8];
+      double UL[8], UR[8];
+      double FL[8], FR[8];
+      for (j=0; j<8; ++j)
+	{
+	  PL[j] = P[i+j] - 0.5*dPdx[i+j];
+	  PR[j] = P[i+j] + 0.5*dPdx[i+j];
+	}
+
+      prim_to_cons_point(PL,UL);
+      prim_to_cons_point(PR,UR);
+
+      rmhd_flux_and_eval(UL, PL, FL, 0, 0);
+      rmhd_flux_and_eval(UR, PR, FR, 0, 0);
+
+      for (j=0; j<8; ++j)
+	{
+	  Ux[i+j] = U[i+j] - 0.5*(dt/dx)*(FR[j]-FL[j]);
+	}
+    }
+
+  failures += cons_to_prim_array(Ux,P,stride[0]/8);
+
+  for (i=sx; i<stride[0]-2*sx; i+=8)
+    {
+      double Pl[8], Pr[8], U_star[8];
+      for (j=0; j<8; ++j)
+	{
+	  Pr[j] = P[i+sx+j] - 0.5*dPdx[i+sx+j];
+	  Pl[j] = P[i   +j] + 0.5*dPdx[i   +j];
+	}
+      hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
+    }
+
+  for (i=sx; i<stride[0]; ++i)
+    {
+      U[i] -= (dt/dx)*(F[i]-F[i-sx]);
+    }
+
+  free(Ux);
+  free(dPdx);
 
   return failures;
 }

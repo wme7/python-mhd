@@ -59,7 +59,7 @@ class ProblemDriver:
                     U[ 0:Ng   ] = U[   Ng  ] # Boundary conditions
                     U[Nx-Ng:Nx] = U[Nx-Ng-1]
 
-                    self.lib.advance_U_ctu_1d(U,dt)
+                    self.lib.advance_U_ctu_1d_2nd_order(U,dt)
 
 
             except LibraryFailure, e:
