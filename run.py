@@ -356,8 +356,8 @@ if __name__ == "__main__":
         #symmetry_test()
 
         #compare_riemann_solver()
-        #compare_reconstruct()
+        compare_reconstruct()
         #compare_limiter()
         #compare_quartic()
-        spherical_blast_3d()
+        #spherical_blast_3d()
 

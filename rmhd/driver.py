@@ -116,7 +116,7 @@ class ProblemDriver:
 
         lib.cons_to_prim_array(U,P,U.size/8)
         lib.finalize()
-        return P
+        return P[self.Ng:-self.Ng]
 
 
     def run_2d(self, lib, state, problem, RK_order=2, CFL=0.5, tfinal=0.2):
@@ -149,7 +149,7 @@ class ProblemDriver:
 
         lib.cons_to_prim_array(U,P,U.size/8)
         lib.finalize()
-        return P
+        return P[self.Ng:-self.Ng,self.Ng:-self.Ng]
 
 
     def run_3d(self, lib, state, problem, RK_order=2, CFL=0.5, tfinal=0.2):
@@ -183,7 +183,7 @@ class ProblemDriver:
 
         lib.cons_to_prim_array(U,P,U.size/8)
         lib.finalize()
-        return P
+        return P[self.Ng:-self.Ng,self.Ng:-self.Ng,self.Ng:-self.Ng]
 
 
     def catch_failure_1d(self):

@@ -65,7 +65,6 @@ int quiet = 0;
 int dimension=1;
 int stride[4];
 double dx,dy,dz;
-double cons_to_prim_last_W;
 double (*slope_limiter)(double, double, double);
 
 double FailedConsState[8];
@@ -105,7 +104,6 @@ static double *PrimitiveArray;
 static double *FluxInterArray_x;
 static double *FluxInterArray_y;
 static double *FluxInterArray_z;
-static double *lib_ux, *lib_uy, *lib_uz;
 
 int Fiph              (const double *P, double *F);
 int prim_to_cons_point(const double *P, double *U);
@@ -287,10 +285,6 @@ int initialize(const double *P, int Nx, int Ny, int Nz,
   FluxInterArray_y = (double*) malloc(stride[0]*sizeof(double));
   FluxInterArray_z = (double*) malloc(stride[0]*sizeof(double));
 
-  lib_ux = (double*) malloc(stride[0]/8*sizeof(double));
-  lib_uy = (double*) malloc(stride[0]/8*sizeof(double));
-  lib_uz = (double*) malloc(stride[0]/8*sizeof(double));
-
   return 0;
 }
 int finalize()
@@ -314,10 +308,6 @@ int finalize()
   free(FluxInterArray_x);
   free(FluxInterArray_y);
   free(FluxInterArray_z);
-
-  free(lib_ux);
-  free(lib_uy);
-  free(lib_uz);
 
   return 0;
 }
@@ -411,8 +401,8 @@ int reconstruct_use_4vel(const double *P0,
   const double uz_r = uz[U] - 0.5 * slope_limiter(uz[ 0], uz[U], uz[V]);
   const double uz_l = uz[0] + 0.5 * slope_limiter(uz[-U], uz[0], uz[U]);
 
-  const double Wr = sqrt(1.0 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
-  const double Wl = sqrt(1.0 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
+  const double Wr = sqrtf(1.0 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
+  const double Wl = sqrtf(1.0 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
 
   Pr[vx] = ux_r/Wr;  Pr[vy] = uy_r/Wr;  Pr[vz] = uz_r/Wr;
   Pl[vx] = ux_l/Wl;  Pl[vy] = uy_l/Wl;  Pl[vz] = uz_l/Wl;
@@ -490,13 +480,25 @@ int dUdt_3d(const double *U, double *L)
 }
 int Fiph(const double *P, double *F)
 {
-  if (libopstate == LibraryOperation_Dead)
-    return 1;
-
   const int S = stride[dimension];
-  hllc_set_dimension(dimension);
-
   int i;
+
+  double *ux=0, *uy=0, *uz=0;
+  if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity)
+    {
+      ux = (double*) malloc(stride[0]/8*sizeof(double));
+      uy = (double*) malloc(stride[0]/8*sizeof(double));
+      uz = (double*) malloc(stride[0]/8*sizeof(double));
+      for (i=0; i<stride[0]; i+=8)
+	{
+	  const double *P0 = &P[i];
+	  double W = 1.0 / sqrt(1.0 - (P0[vx]*P0[vx] + P0[vy]*P0[vy] + P0[vz]*P0[vz]));
+	  ux[i/8] = W*P0[vx];
+	  uy[i/8] = W*P0[vy];
+	  uz[i/8] = W*P0[vz];
+	}
+    }
+
   for (i=0; i<S; ++i)
     {
       F[i] = 0;
@@ -519,10 +521,8 @@ int Fiph(const double *P, double *F)
           break;
 
         case Reconstruct_PLM4Velocity:
-          reconstruct_use_4vel(P0, &lib_ux[i/8], &lib_uy[i/8], &lib_uz[i/8], Pl, Pr);
+          reconstruct_use_4vel(P0, &ux[i/8], &uy[i/8], &uz[i/8], Pl, Pr);
           break;
-	  // WARNING! this option will only work if cons_to_prim_array was 
-	  // called immediately prior. Should find a way around this...
 
         default:
           reconstruct_use_3vel(P0, Pl, Pr);
@@ -546,6 +546,13 @@ int Fiph(const double *P, double *F)
   for (i=stride[0]-S*2; i<stride[0]; ++i)
     {
       F[i] = 0;
+    }
+
+ if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity)
+    {
+      free(ux);
+      free(uy);
+      free(uz);
     }
   return 0;
 }
@@ -875,8 +882,6 @@ int cons_to_prim_point(const double *U, double *P)
   P[By ] =   U[By];
   P[Bz ] =   U[Bz];
 
-  cons_to_prim_last_W = W;
-
   return 0;
 }
 int cons_to_prim_array(const double *U, double *P, int N)
@@ -901,15 +906,6 @@ int cons_to_prim_array(const double *U, double *P, int N)
 	  if (return_on_failure) return 1;
 	  else failures++;
 	}
-
-      if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity &&
-          libopstate == LibraryOperation_Alive)
-        {
-          double W = cons_to_prim_last_W;
-          lib_ux[i/8] = W*Pi[vx];
-          lib_uy[i/8] = W*Pi[vy];
-          lib_uz[i/8] = W*Pi[vz];
-        }
     }
   return failures;
 }
