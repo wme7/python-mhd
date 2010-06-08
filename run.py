@@ -5,33 +5,42 @@ def sr_shocktube():
 
     from rmhd import LibraryState, visual, _lib, riemann
     from rmhd.driver import ProblemDriver
+    from pylab import figure
 
-    driver = ProblemDriver(N=(1024,), L=(1.0,))
-    problem = SRShockTube2()
-    state = LibraryState()
+    driver = ProblemDriver(N=(256,), L=(1.0,))
+    problem = SRShockTube3()
+    state0 = LibraryState(mode_riemann_solver=1)
+    state1 = LibraryState(mode_riemann_solver=1, mode_slope_limiter=0)
 
-    P0 = riemann.exact_sr_vt(    problem, tfinal=0.2)
-    P1 = driver.run(_lib, state, problem, tfinal=0.2, CFL=0.5)
+    PE = riemann.exact_sr_vt(    problem, tfinal=0.6)
+    P0 = driver.run(_lib, state0, problem, tfinal=0.6, CFL=0.5, RK_order=3)
+    P1 = driver.run(_lib, state1, problem, tfinal=0.6, CFL=0.5, RK_order=4)
 
-    visual.shocktube(P0, label="exact", linestyle='-', marker='None', lw=2)
-    visual.shocktube(P1, label="HLL", linestyle='--')
+    fig = figure()
+    fig.text(.5, .95,
+              r"Zhang & MacFadyen (2005) Section 6.1 on 256 zones"+
+              r"   $t=0.6s$   CFL=$0.5$   $\theta_{PLM}=2.0$", 
+              fontsize=14, horizontalalignment='center')
+
+    visual.shocktube(PE, label="exact", linestyle='-', marker='None', lw=2)
+    visual.shocktube(P0, label="HLL +RK3+PLM", linestyle='--')
+    visual.shocktube(P1, label="HLLC+CTU+PLM", linestyle=':', lw=3)
     visual.show()
 
 
 def compare_mlines_ctu():
-
 
     from pylab import show
     from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
 
     driver = ProblemDriver(N=(1024,), L=(1.0,))
-    problem = RMHDShockTube2()
+    problem = RMHDShockTube4()
     state = LibraryState(plm_theta=2.0, mode_slope_limiter=0)
 
-    run_args = {'CFL':0.5, 'tfinal':0.2}
+    run_args = {'CFL':0.8, 'tfinal':0.2}
 
-    P0 = driver.run(_lib, state, problem, name='method of lines, RK3', RK_order=3, **run_args)
+    P0 = driver.run(_lib, state, problem, name='method of lines, RK3', RK_order=2, **run_args)
     P1 = driver.run(_lib, state, problem, name='CTU, first order    ', RK_order=4, **run_args)
 
     visual.shocktube(P0, label='method of lines, RK3', linestyle='--', mfc='None')
@@ -52,7 +61,7 @@ def compare_reconstruct():
     state1  = LibraryState(mode_reconstruct=1)
     state2  = LibraryState(mode_reconstruct=2)
 
-    run_args = {'CFL':0.5, 'tfinal':0.2}
+    run_args = {'CFL':0.5, 'tfinal':0.2, 'RK_order':3}
 
     P0 = driver.run(_lib, state0, problem, name='piecewise constant', **run_args)
     P1 = driver.run(_lib, state1, problem, name='PLM on 3-velocity ', **run_args)
@@ -77,19 +86,19 @@ def compare_limiter():
     stateA  = LibraryState(mode_reconstruct=0)
     state0  = LibraryState(mode_slope_limiter=0)
     state1  = LibraryState(mode_slope_limiter=1)
-    #state2  = LibraryState(mode_slope_limiter=2)
+    state2  = LibraryState(mode_slope_limiter=2)
 
-    run_args = {'CFL':0.5, 'tfinal':0.2}
+    run_args = {'CFL':0.5, 'tfinal':0.2, 'RK_order':4}
 
     PA = driver.run(_lib, stateA, problem, **run_args)
     P0 = driver.run(_lib, state0, problem, **run_args)
     P1 = driver.run(_lib, state1, problem, **run_args)
-    #P2 = driver.run(_lib, state2, problem, **run_args)
+    P2 = driver.run(_lib, state2, problem, **run_args)
 
     visual.shocktube(PA, label="no reconstruct", linestyle='-', marker='None')
     visual.shocktube(P0, label="minmod", linestyle='--', mfc='None')
     visual.shocktube(P1, label="MC", linestyle='-.', mfc='None')
-    #visual.shocktube(P2, label="harmonic mean", linestyle=':', lw=3, marker='None')
+    visual.shocktube(P2, label="harmonic mean", linestyle=':', lw=3, marker='None')
     visual.show()
 
 
@@ -371,7 +380,7 @@ if __name__ == "__main__":
         analyze_failed_state(args[0])
 
     else:
-        #sr_shocktube()
+        sr_shocktube()
         #riemann_wave_pattern()
         #cylindrical_blast()
         #quadrant_problem()
@@ -382,4 +391,4 @@ if __name__ == "__main__":
         #compare_reconstruct()
         #compare_limiter()
         #compare_quartic()
-        compare_mlines_ctu()
+        #compare_mlines_ctu()

@@ -11,4 +11,4 @@ if __name__ == "__main__":
     librmhd = Extension('librmhd', srcrmhd, extra_compile_args=["-Wall"])
     sr_riemann = Extension('sr_riemann', ['src/sr_riemann.f', 'src/sr_riemann-vt.f'])
 
-    setup(name='rmhd', ext_modules=[librmhd])
+    setup(name='rmhd', ext_modules=[librmhd, sr_riemann])

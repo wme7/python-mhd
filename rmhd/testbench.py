@@ -224,8 +224,8 @@ class SRShockTube1(ShockTubeProblem):
 class SRShockTube2(ShockTubeProblem):
 
     """
-    This is Problem 2 of Marti & Muller's article. It is very
-    challenging and still fails many modern SR codes.
+    This is Problem 2 of Marti & Muller's article. It is very challenging
+    and still fails many modern SR codes.
 
     See: http://relativity.livingreviews.org/Articles/lrr-2003-7/
     """
@@ -239,6 +239,25 @@ class SRShockTube2(ShockTubeProblem):
 
         self.L_state = { 'Rho': 1.0, 'Pre':1000.00, 'v': [0,0,0], 'B': [0,0,0] }
         self.R_state = { 'Rho': 1.0, 'Pre':   0.01, 'v': [0,0,0], 'B': [0,0,0] }
+
+
+class SRShockTube3(ShockTubeProblem):
+
+    """
+    This is the transverse velocity problem presented in section 6-1
+    of Zhang & MacFadyen (2005). It is identical to SRShockTube2, except
+    for the presence of transverse velocity on both sides of the domain.
+    """
+
+    def __init__(self, **kwargs):
+
+        ShockTubeProblem.__init__(self, **kwargs)
+
+
+    def _setup(self):
+
+        self.L_state = { 'Rho': 1.0, 'Pre':1000.00, 'v': [0,0.9,0], 'B': [0,0,0] }
+        self.R_state = { 'Rho': 1.0, 'Pre':   0.01, 'v': [0,0.9,0], 'B': [0,0,0] }
 
 
 class RMHDShockTube1(ShockTubeProblem):

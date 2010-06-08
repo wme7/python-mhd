@@ -1019,9 +1019,9 @@ int advance_U_ctu_1d_2nd_order(double *U, double dt)
     }
   for (i=0; i<stride[0]; i+=8)
     {
-      double PL[8], PR[8];
-      double UL[8], UR[8];
-      double FL[8], FR[8];
+      double PL[8], PR[8]; // Capital L/R refers to left and right interior
+      double UL[8], UR[8]; // walls of the local cell, whereas lower case l/r
+      double FL[8], FR[8]; // are with respect to the zone interface at i+1/2
       for (j=0; j<8; ++j)
 	{
 	  PL[j] = P[i+j] - 0.5*dPdx[i+j];

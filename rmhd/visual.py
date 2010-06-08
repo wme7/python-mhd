@@ -77,7 +77,7 @@ def four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, **kwargs):
     """
 
 
-def shocktube(P, x=(-1,1), **kwargs):
+def shocktube(P, x=(0,1), **kwargs):
 
     from pylab import sqrt, linspace, subplot, plot, text, xlabel, figure, show
     from pylab import subplots_adjust, setp, gca, LinearLocator, rcParams, legend
@@ -100,18 +100,18 @@ def shocktube(P, x=(-1,1), **kwargs):
     ax = subplot(2,3,1)
     plot(X,rho, **plot_args)
     text(0.9,0.9, r"$\rho$", transform = ax.transAxes, fontsize=20)
-    setp(ax.get_xticklabels(), visible=False)
-    if 'label' in plot_args: legend(loc='lower left')
+    #setp(ax.get_xticklabels(), visible=False)
+    if 'label' in plot_args: legend(loc='upper left')
 
     ax = subplot(2,3,2)
     plot(X,pre, **plot_args)
     text(0.9,0.9, r"$P$", transform = ax.transAxes, fontsize=20)
-    setp(ax.get_xticklabels(), visible=False)
+    #setp(ax.get_xticklabels(), visible=False)
 
     ax = subplot(2,3,3)
     plot(X, g, **plot_args)
     text(0.9,0.9, r"$\gamma$", transform = ax.transAxes, fontsize=20)
-    setp(ax.get_xticklabels(), visible=False)
+    #setp(ax.get_xticklabels(), visible=False)
 
     ax = subplot(2,3,4)
     plot(X, vx, **plot_args)
@@ -128,7 +128,7 @@ def shocktube(P, x=(-1,1), **kwargs):
     text(0.9,0.9, r"$B_y$", transform = ax.transAxes, fontsize=20)
     xlabel(r"$x$")
 
-    subplots_adjust(hspace=0.05)
+    subplots_adjust(hspace=0.15)
 
 
 def show():
