@@ -43,7 +43,7 @@ class ProblemDriver:
                 if self.RK_order is 1:
                     U += dt*dUdt(U)
 
-                if self.RK_order is 2:
+                elif self.RK_order is 2:
                     L1 =    dUdt(U);
                     U += dt*dUdt(U + 0.5*dt*L1);
 
@@ -53,16 +53,35 @@ class ProblemDriver:
                     U  = 1./3*U + 2./3*U1 + 2./3 * dt * dUdt(U1)
 
                 elif self.RK_order is 4:
-                    Ng = self.Ng
-                    Nx, = self.N
 
-                    U[ 0:Ng   ] = U[   Ng  ] # Boundary conditions
-                    U[Nx-Ng:Nx] = U[Nx-Ng-1]
+                    if len(self.N) is 1:
 
-                    self.lib.advance_U_ctu_1d_2nd_order(U,dt)
+                        Ng = self.Ng
+                        Nx, = self.N
+
+                        U[ 0:Ng   ] = U[   Ng  ] # Boundary conditions
+                        U[Nx-Ng:Nx] = U[Nx-Ng-1]
+
+                        self.failures += self.lib.advance_U_ctu_1d_2nd_order(U,dt)
+
+                    elif len(self.N) is 2:
+
+                        Ng = self.Ng
+                        Nx,Ny = self.N
+
+                        for i in range(Ng): # Boundary conditions
+
+                            U[   i  ,:] = U[   Ng  ,:]
+                            U[Nx-i-1,:] = U[Nx-Ng-1,:]
+
+                            U[:,   i  ] = U[:,   Ng  ]
+                            U[:,Ny-i-1] = U[:,Ny-Ng-1]
+
+                        self.failures += self.lib.advance_U_ctu_2d_2nd_order(U,dt)
 
 
             except LibraryFailure, e:
+
                 print "\n\n"
                 print "Caught exception", e.__class__, "at index", e.FailedIndexLocation
                 from os import system

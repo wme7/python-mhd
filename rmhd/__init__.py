@@ -90,8 +90,8 @@ _lib.get_state.restype  =   LibraryState
 _lib.get_failed_state.argtypes = [write_array]*2
 
 
-_lib.advance_U_ctu_1d          .argtypes = [write_array, c_double]
 _lib.advance_U_ctu_1d_2nd_order.argtypes = [write_array, c_double]
+_lib.advance_U_ctu_2d_2nd_order.argtypes = [write_array, c_double]
 
 
 # Access to the library's internal quartic solver

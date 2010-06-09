@@ -49,8 +49,8 @@ enum ReconstructMode { Reconstruct_PiecewiseConstant,
                        Reconstruct_PLM4Velocity };
 
 enum SlopeLimiterMode { SlopeLimiter_Minmod,
-			SlopeLimiter_MonotizedCentral,
-			SlopeLimiter_HarmonicMean };
+                        SlopeLimiter_MonotizedCentral,
+                        SlopeLimiter_HarmonicMean };
 
 enum QuarticSolverMode { QuarticSolver_Exact,
                          QuarticSolver_Approx1,
@@ -70,7 +70,7 @@ double (*slope_limiter)(double, double, double);
 double FailedConsState[8];
 double FailedPrimState[8];
 int FailedIndexLocation;
-int return_on_failure=1;
+int return_on_failure=0;
 
 struct LibraryState
 {
@@ -90,7 +90,7 @@ struct LibraryState
                 0.0,1.4,2.0,
                 RiemannSolver_HLL,
                 Reconstruct_PLM4Velocity,
-		SlopeLimiter_Minmod,
+                SlopeLimiter_Minmod,
                 QuarticSolver_Exact };
 
 
@@ -341,14 +341,16 @@ int hll_flux(const double *pl, const double *pr, double *U, double *F, double s)
       F_hll[i] = (ap*Fl[i] - am*Fr[i] + ap*am*(Ur[i] - Ul[i])) / (ap - am);
     }
 
-  if      (         s<=am ) for (i=0; i<8; ++i) U[i] = Ul   [i];
-  else if ( am<s && s<=ap ) for (i=0; i<8; ++i) U[i] = U_hll[i];
-  else if ( ap<s          ) for (i=0; i<8; ++i) U[i] = Ur   [i];
-
-  if      (         s<=am ) for (i=0; i<8; ++i) F[i] = Fl   [i];
-  else if ( am<s && s<=ap ) for (i=0; i<8; ++i) F[i] = F_hll[i];
-  else if ( ap<s          ) for (i=0; i<8; ++i) F[i] = Fr   [i];
-
+  if (U != 0) {
+    if      (         s<=am ) for (i=0; i<8; ++i) U[i] = Ul   [i];
+    else if ( am<s && s<=ap ) for (i=0; i<8; ++i) U[i] = U_hll[i];
+    else if ( ap<s          ) for (i=0; i<8; ++i) U[i] = Ur   [i];
+  }
+  {
+    if      (         s<=am ) for (i=0; i<8; ++i) F[i] = Fl   [i];
+    else if ( am<s && s<=ap ) for (i=0; i<8; ++i) F[i] = F_hll[i];
+    else if ( ap<s          ) for (i=0; i<8; ++i) F[i] = Fr   [i];
+  }
   return 0;
 }
 
@@ -487,13 +489,13 @@ int Fiph(const double *P, double *F)
       uy = (double*) malloc(stride[0]/8*sizeof(double));
       uz = (double*) malloc(stride[0]/8*sizeof(double));
       for (i=0; i<stride[0]; i+=8)
-	{
-	  const double *P0 = &P[i];
-	  double W = 1.0 / sqrt(1.0 - (P0[vx]*P0[vx] + P0[vy]*P0[vy] + P0[vz]*P0[vz]));
-	  ux[i/8] = W*P0[vx];
-	  uy[i/8] = W*P0[vy];
-	  uz[i/8] = W*P0[vz];
-	}
+        {
+          const double *P0 = &P[i];
+          double W = 1.0 / sqrt(1.0 - (P0[vx]*P0[vx] + P0[vy]*P0[vy] + P0[vz]*P0[vz]));
+          ux[i/8] = W*P0[vx];
+          uy[i/8] = W*P0[vy];
+          uz[i/8] = W*P0[vz];
+        }
     }
 
   for (i=0; i<S; ++i)
@@ -526,17 +528,16 @@ int Fiph(const double *P, double *F)
           break;
         }
 
-      double U_star[8];
       switch (lib_state.mode_riemann_solver)
         {
         case RiemannSolver_HLL:
-          hll_flux (Pl, Pr, U_star, &F[i], 0.0);
+          hll_flux (Pl, Pr, 0, &F[i], 0.0);
           break;
         case RiemannSolver_HLLC:
-          hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
+          hllc_flux(Pl, Pr, 0, &F[i], 0.0);
           break;
         default:
-          hll_flux (Pl, Pr, U_star, &F[i], 0.0);
+          hll_flux (Pl, Pr, 0, &F[i], 0.0);
           break;
         }
     }
@@ -545,7 +546,7 @@ int Fiph(const double *P, double *F)
       F[i] = 0;
     }
 
- if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity)
+  if (lib_state.mode_reconstruct == Reconstruct_PLM4Velocity)
     {
       free(ux);
       free(uy);
@@ -863,8 +864,8 @@ int cons_to_prim_point(const double *U, double *P)
             }
           else
             {
-	      memcpy(FailedConsState, U, 8*sizeof(double));
-	      memcpy(FailedPrimState, P, 8*sizeof(double));
+              memcpy(FailedConsState, U, 8*sizeof(double));
+              memcpy(FailedPrimState, P, 8*sizeof(double));
               return 1;
             }
         }
@@ -900,11 +901,11 @@ int cons_to_prim_array(const double *U, double *P, int N)
       double       *Pi = &P[i];
 
       if (cons_to_prim_point(Ui,Pi))
-	{
-	  FailedIndexLocation = i/8;
-	  if (return_on_failure) return 1;
-	  else failures++;
-	}
+        {
+          FailedIndexLocation = i/8;
+          if (return_on_failure) return 1;
+          else failures++;
+        }
     }
   return failures;
 }
@@ -946,57 +947,6 @@ int prim_to_cons_array(const double *P, double *U, int N)
   return 0;
 }
 
-
-
-int advance_U_ctu_1d(double *U, double dt)
-{
-  if (libopstate == LibraryOperation_Dead)
-    return 1;
-
-  double *P = PrimitiveArray;
-  double *F = FluxInterArray_x;
-
-  int i,sx=stride[1];
-  int failures = cons_to_prim_array(U,P,stride[0]/8);
-
-  set_dimension(1);
-
-  double *Ux = (double*) malloc(stride[0]*sizeof(double));
-
-  for (i=0; i<stride[0]; i+=8)
-    { // BC's expected to be set, all fluxes are valid
-      rmhd_flux_and_eval(&U[i], &P[i], &F[i], 0, 0);
-    }
-
-  for (i=sx; i<stride[0]-sx; ++i)
-    { // Outermost 1 cells are not updated
-      Ux[i] = U[i] - 0.5*(dt/dx)*(F[i+sx]-F[i-sx]);
-    }
-
-  failures += cons_to_prim_array(Ux,P,stride[0]/8);
-
-  for (i=0; i<stride[0]-sx; i+=8)
-    {
-      double Pl[8], Pr[8];
-      const double *P0 = &P[i];
-
-      memcpy(Pl, P0   , 8*sizeof(double));
-      memcpy(Pr, P0+sx, 8*sizeof(double));
-
-      double U_star[8];
-      hll_flux(Pl, Pr, U_star, &F[i], 0.0);
-    }
-
-  for (i=sx; i<stride[0]; ++i)
-    {
-      U[i] -= (dt/dx)*(F[i]-F[i-sx]);
-    }
-
-  free(Ux);
-
-  return failures;
-}
-
 int advance_U_ctu_1d_2nd_order(double *U, double dt)
 {
   if (libopstate == LibraryOperation_Dead)
@@ -1017,16 +967,17 @@ int advance_U_ctu_1d_2nd_order(double *U, double dt)
     {
       dPdx[i] = slope_limiter(P[i-sx], P[i], P[i+sx]);
     }
+
   for (i=0; i<stride[0]; i+=8)
     {
       double PL[8], PR[8]; // Capital L/R refers to left and right interior
       double UL[8], UR[8]; // walls of the local cell, whereas lower case l/r
       double FL[8], FR[8]; // are with respect to the zone interface at i+1/2
       for (j=0; j<8; ++j)
-	{
-	  PL[j] = P[i+j] - 0.5*dPdx[i+j];
-	  PR[j] = P[i+j] + 0.5*dPdx[i+j];
-	}
+        {
+          PL[j] = P[i+j] - 0.5*dPdx[i+j];
+          PR[j] = P[i+j] + 0.5*dPdx[i+j];
+        }
 
       prim_to_cons_point(PL,UL);
       prim_to_cons_point(PR,UR);
@@ -1035,22 +986,22 @@ int advance_U_ctu_1d_2nd_order(double *U, double dt)
       rmhd_flux_and_eval(UR, PR, FR, 0, 0);
 
       for (j=0; j<8; ++j)
-	{
-	  Ux[i+j] = U[i+j] - 0.5*(dt/dx)*(FR[j]-FL[j]);
-	}
+        {
+          Ux[i+j] = U[i+j] - 0.5*(dt/dx)*(FR[j]-FL[j]);
+        }
     }
 
   failures += cons_to_prim_array(Ux,P,stride[0]/8);
 
   for (i=sx; i<stride[0]-2*sx; i+=8)
     {
-      double Pl[8], Pr[8], U_star[8];
+      double Pl[8], Pr[8];
       for (j=0; j<8; ++j)
-	{
-	  Pr[j] = P[i+sx+j] - 0.5*dPdx[i+sx+j];
-	  Pl[j] = P[i   +j] + 0.5*dPdx[i   +j];
-	}
-      hllc_flux(Pl, Pr, U_star, &F[i], 0.0);
+        {
+          Pr[j] = P[i+sx+j] - 0.5*dPdx[i+sx+j];
+          Pl[j] = P[i   +j] + 0.5*dPdx[i   +j];
+        }
+      hllc_flux(Pl, Pr, 0, &F[i], 0.0);
     }
 
   for (i=sx; i<stride[0]; ++i)
@@ -1060,6 +1011,178 @@ int advance_U_ctu_1d_2nd_order(double *U, double dt)
 
   free(Ux);
   free(dPdx);
+
+  return failures;
+}
+
+
+int advance_U_ctu_2d_2nd_order(double *U, double dt)
+{
+  if (libopstate == LibraryOperation_Dead)
+    return 1;
+
+  double *F = FluxInterArray_x;
+  double *G = FluxInterArray_y;
+  double *P = (double*) malloc(stride[0]*sizeof(double));
+
+  double *Ux   = (double*) malloc(stride[0]*sizeof(double));
+  double *Uy   = (double*) malloc(stride[0]*sizeof(double));
+
+  double *Px   = (double*) malloc(stride[0]*sizeof(double));
+  double *Py   = (double*) malloc(stride[0]*sizeof(double));
+
+  double *dPdx = (double*) malloc(stride[0]*sizeof(double));
+  double *dPdy = (double*) malloc(stride[0]*sizeof(double));
+
+  int i,j,sx=stride[1],sy=stride[2];
+  int failures = cons_to_prim_array(U,P,stride[0]/8);
+
+  /* Step 1
+     ---------------------------------------------------------------------------------------
+     Compute the slopes of primitive quantities in each direction.
+
+     Note: These derivatives, computed at the beginning of the time step, are used for the
+     reconstructed values in the Hancock and Godunov operators for both the predictor and
+     corrector steps.
+     ---------------------------------------------------------------------------------------
+  */
+  for (i=sx; i<stride[0]-sx; ++i)
+    {
+      dPdx[i] = slope_limiter(P[i-sx], P[i], P[i+sx]);
+      dPdy[i] = slope_limiter(P[i-sy], P[i], P[i+sy]);
+    }
+
+  /* Step 2
+     ---------------------------------------------------------------------------------------
+     Apply the Godunov operator to each faces in all directions.
+
+     Notes:
+
+     1) The whole array of intercell fluxes is computed at once, rather than one cell at a
+     time. This avoids redundant evaluations of the Godunov operator by computing only one
+     solution to the Riemann problem per face.
+
+     2) For the predictor step along a given axis, only the intercell fluxes in the
+     transverse directions are used. The Hancock operator is applied along the longitudinal
+     direction.
+     ---------------------------------------------------------------------------------------
+  */
+  for (i=0; i<stride[0]-sx; i+=8)
+    {
+      double Pl[8], Pr[8];
+
+      set_dimension(1); // -----------------------------------------------------
+      for (j=0; j<8; ++j)
+        {
+          Pr[j] = P[i+sx+j] - 0.5*dPdx[i+sx+j];
+          Pl[j] = P[i   +j] + 0.5*dPdx[i   +j];
+        }
+      hll_flux(Pl, Pr, 0, &F[i], 0.0);
+
+      set_dimension(2); // -----------------------------------------------------
+      for (j=0; j<8; ++j)
+        {
+          Pr[j] = P[i+sy+j] - 0.5*dPdy[i+sy+j];
+          Pl[j] = P[i   +j] + 0.5*dPdy[i   +j];
+        }
+      hll_flux(Pl, Pr, 0, &G[i], 0.0);
+    }
+
+  /* Step 3
+     ---------------------------------------------------------------------------------------
+     Apply the Hancock operators and complete the corrector step.
+
+     Notes: This update occurs for a given cell all at once. The Hancock operator is
+     evaluated by summing the fluxes on the inner walls of the local cell, so there is no
+     danger of redundant calculations.
+     ---------------------------------------------------------------------------------------
+  */
+  for (i=0; i<stride[0]; i+=8)
+    {
+      double PL[8], PR[8]; // Capital L/R refers to left and right interior walls of the
+      double UL[8], UR[8]; // local cell, whereas lower-case l/r refer to i_{+-1/2}
+
+      double FL[8], FR[8];
+      double GL[8], GR[8];
+
+      set_dimension(1); // -----------------------------------------------------
+      for (j=0; j<8; ++j)
+        {
+          PL[j] = P[i+j] - 0.5*dPdx[i+j]; // Primitive states on the inner x-facing
+          PR[j] = P[i+j] + 0.5*dPdx[i+j]; // walls of the local cell.
+        }
+
+      prim_to_cons_point(PL,UL); // Corresponding conserved quantities and fluxes
+      prim_to_cons_point(PR,UR); // in the x-direction.
+
+      rmhd_flux_and_eval(UL, PL, FL, 0, 0);
+      rmhd_flux_and_eval(UR, PR, FR, 0, 0);
+
+      set_dimension(2); // -----------------------------------------------------
+      for (j=0; j<8; ++j)
+        {
+          PL[j] = P[i+j] - 0.5*dPdy[i+j]; // Primitive states on the inner y-facing
+          PR[j] = P[i+j] + 0.5*dPdy[i+j]; // walls of the local cell.
+        }
+
+      prim_to_cons_point(PL,UL); // Corresponding conserved quantities and fluxes
+      prim_to_cons_point(PR,UR); // in the y-direction.
+
+      rmhd_flux_and_eval(UL, PL, GL, 0, 0);
+      rmhd_flux_and_eval(UR, PR, GR, 0, 0);
+
+      for (j=0; j<8; ++j)
+        {
+	  //                   Godunov (transverse)    Hancock (normal)
+	  // ===========================================================================
+          Ux[i+j] = U[i+j] - ((G[i+j]-G[i-sy+j])/dy + (FR[j]-FL[j])/dx)*0.5*dt;
+	  Uy[i+j] = U[i+j] - ((F[i+j]-F[i-sx+j])/dx + (GR[j]-GL[j])/dy)*0.5*dt;
+	  // ===========================================================================
+        }
+    }
+
+  failures += cons_to_prim_array(Ux,Px,stride[0]/8); // Inversion of the predicted U-states
+  failures += cons_to_prim_array(Uy,Py,stride[0]/8); // for each direction.
+
+  /* Step 4
+     ---------------------------------------------------------------------------------------
+     Complete the integration by applying the Godunov fluxes.
+
+     Notes: The final derivative operator is obtained from the Godunov intercell fluxes,
+     which in turn are computed using the cell-centered predicted state, reconstructed to
+     zone edges using the derivatives from the beginning of the time step.
+     ---------------------------------------------------------------------------------------
+  */
+  for (i=sx; i<stride[0]-sx; i+=8)
+    {
+      double Pl[8], Pr[8];
+
+      set_dimension(1); // -----------------------------------------------------
+      for (j=0; j<8; ++j)
+        {
+          Pr[j] = Px[i+sx+j] - 0.5*dPdx[i+sx+j];
+          Pl[j] = Px[i   +j] + 0.5*dPdx[i   +j];
+        }
+      hll_flux(Pl, Pr, 0, &F[i], 0.0);
+
+      set_dimension(2); // -----------------------------------------------------
+      for (j=0; j<8; ++j)
+        {
+          Pr[j] = Py[i+sy+j] - 0.5*dPdy[i+sy+j];
+          Pl[j] = Py[i   +j] + 0.5*dPdy[i   +j];
+        }
+      hll_flux(Pl, Pr, 0, &G[i], 0.0);
+    }
+
+  for (i=sx; i<stride[0]; ++i)
+    {
+      U[i] -= (dt/dx)*(F[i]-F[i-sx]) + (dt/dy)*(G[i]-G[i-sy]);
+    }
+
+  free(P);
+  free(Ux);    free(Uy);
+  free(Px);    free(Py);
+  free(dPdx);  free(dPdy);
 
   return failures;
 }

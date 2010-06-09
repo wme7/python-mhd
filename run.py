@@ -12,7 +12,7 @@ def sr_shocktube():
     state0 = LibraryState(mode_riemann_solver=1)
     state1 = LibraryState(mode_riemann_solver=1, mode_slope_limiter=0)
 
-    PE = riemann.exact_sr_vt(    problem, tfinal=0.6)
+    PE = riemann.exact_sr_vt(     problem, tfinal=0.6)
     P0 = driver.run(_lib, state0, problem, tfinal=0.6, CFL=0.5, RK_order=3)
     P1 = driver.run(_lib, state1, problem, tfinal=0.6, CFL=0.5, RK_order=4)
 
@@ -26,6 +26,25 @@ def sr_shocktube():
     visual.shocktube(P0, label="HLL +RK3+PLM", linestyle='--')
     visual.shocktube(P1, label="HLLC+CTU+PLM", linestyle=':', lw=3)
     visual.show()
+
+
+
+def sr_2d_explosion():
+
+    from rmhd import _lib, LibraryState, visual
+    from rmhd.driver import ProblemDriver
+
+    driver = ProblemDriver(N=(128,128), L=(1.0,1.0))
+    problem = RMHDCylindricalA(pre=1.0, I={'B':[0,0,0]}, O={'B':[0,0,0]})
+    state = LibraryState(plm_theta=2.0)
+
+    run_args = {'name': "cylindrical blast wave",
+                'RK_order': 4, 'CFL': 0.6, 'tfinal': 0.20}
+
+    P = driver.run(_lib, state, problem, **run_args)
+    visual.four_pane_2d(P, extent=[-1,1,-1,1])
+    visual.show()
+
 
 
 def compare_mlines_ctu():
@@ -380,7 +399,8 @@ if __name__ == "__main__":
         analyze_failed_state(args[0])
 
     else:
-        sr_shocktube()
+        sr_2d_explosion()
+        #sr_shocktube()
         #riemann_wave_pattern()
         #cylindrical_blast()
         #quadrant_problem()
