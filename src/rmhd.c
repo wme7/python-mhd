@@ -66,6 +66,7 @@ int dimension=1;
 int stride[4];
 double dx,dy,dz;
 double (*slope_limiter)(double, double, double);
+int (*godunov_intercell_flux)(const double*, const double*, double*, double*, double);
 
 double FailedConsState[8];
 double FailedPrimState[8];
@@ -232,6 +233,15 @@ int set_state(struct LibraryState state)
       break;
     }
 
+  switch (lib_state.mode_riemann_solver)
+    {
+    case RiemannSolver_HLL:
+      godunov_intercell_flux = hll_flux;
+      break;
+    case RiemannSolver_HLLC:
+      godunov_intercell_flux = hllc_flux;
+      break;
+    }
   return 0;
 }
 struct LibraryState get_state()
@@ -402,8 +412,8 @@ int reconstruct_use_4vel(const double *P0,
   const double uz_r = uz[U] - 0.5 * slope_limiter(uz[ 0], uz[U], uz[V]);
   const double uz_l = uz[0] + 0.5 * slope_limiter(uz[-U], uz[0], uz[U]);
 
-  const double Wr = sqrtf(1.0 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
-  const double Wl = sqrtf(1.0 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
+  const double Wr = sqrt(1.0 + ux_r*ux_r + uy_r*uy_r + uz_r*uz_r);
+  const double Wl = sqrt(1.0 + ux_l*ux_l + uy_l*uy_l + uz_l*uz_l);
 
   Pr[vx] = ux_r/Wr;  Pr[vy] = uy_r/Wr;  Pr[vz] = uz_r/Wr;
   Pl[vx] = ux_l/Wl;  Pl[vy] = uy_l/Wl;  Pl[vz] = uz_l/Wl;
@@ -528,18 +538,7 @@ int Fiph(const double *P, double *F)
           break;
         }
 
-      switch (lib_state.mode_riemann_solver)
-        {
-        case RiemannSolver_HLL:
-          hll_flux (Pl, Pr, 0, &F[i], 0.0);
-          break;
-        case RiemannSolver_HLLC:
-          hllc_flux(Pl, Pr, 0, &F[i], 0.0);
-          break;
-        default:
-          hll_flux (Pl, Pr, 0, &F[i], 0.0);
-          break;
-        }
+      godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0);
     }
   for (i=stride[0]-S*2; i<stride[0]; ++i)
     {
@@ -1001,7 +1000,7 @@ int advance_U_ctu_1d_2nd_order(double *U, double dt)
           Pr[j] = P[i+sx+j] - 0.5*dPdx[i+sx+j];
           Pl[j] = P[i   +j] + 0.5*dPdx[i   +j];
         }
-      hllc_flux(Pl, Pr, 0, &F[i], 0.0);
+      godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0);
     }
 
   for (i=sx; i<stride[0]; ++i)
@@ -1077,7 +1076,7 @@ int advance_U_ctu_2d_2nd_order(double *U, double dt)
           Pr[j] = P[i+sx+j] - 0.5*dPdx[i+sx+j];
           Pl[j] = P[i   +j] + 0.5*dPdx[i   +j];
         }
-      hll_flux(Pl, Pr, 0, &F[i], 0.0);
+      godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0);
 
       set_dimension(2); // -----------------------------------------------------
       for (j=0; j<8; ++j)
@@ -1085,7 +1084,7 @@ int advance_U_ctu_2d_2nd_order(double *U, double dt)
           Pr[j] = P[i+sy+j] - 0.5*dPdy[i+sy+j];
           Pl[j] = P[i   +j] + 0.5*dPdy[i   +j];
         }
-      hll_flux(Pl, Pr, 0, &G[i], 0.0);
+      godunov_intercell_flux(Pl, Pr, 0, &G[i], 0.0);
     }
 
   /* Step 3
@@ -1163,7 +1162,7 @@ int advance_U_ctu_2d_2nd_order(double *U, double dt)
           Pr[j] = Px[i+sx+j] - 0.5*dPdx[i+sx+j];
           Pl[j] = Px[i   +j] + 0.5*dPdx[i   +j];
         }
-      hll_flux(Pl, Pr, 0, &F[i], 0.0);
+      godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0);
 
       set_dimension(2); // -----------------------------------------------------
       for (j=0; j<8; ++j)
@@ -1171,7 +1170,7 @@ int advance_U_ctu_2d_2nd_order(double *U, double dt)
           Pr[j] = Py[i+sy+j] - 0.5*dPdy[i+sy+j];
           Pl[j] = Py[i   +j] + 0.5*dPdy[i   +j];
         }
-      hll_flux(Pl, Pr, 0, &G[i], 0.0);
+      godunov_intercell_flux(Pl, Pr, 0, &G[i], 0.0);
     }
 
   for (i=sx; i<stride[0]; ++i)

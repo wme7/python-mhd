@@ -29,24 +29,6 @@ def sr_shocktube():
 
 
 
-def sr_2d_explosion():
-
-    from rmhd import _lib, LibraryState, visual
-    from rmhd.driver import ProblemDriver
-
-    driver = ProblemDriver(N=(128,128), L=(1.0,1.0))
-    problem = RMHDCylindricalA(pre=1.0, I={'B':[0,0,0]}, O={'B':[0,0,0]})
-    state = LibraryState(plm_theta=2.0)
-
-    run_args = {'name': "cylindrical blast wave",
-                'RK_order': 4, 'CFL': 0.6, 'tfinal': 0.20}
-
-    P = driver.run(_lib, state, problem, **run_args)
-    visual.four_pane_2d(P, extent=[-1,1,-1,1])
-    visual.show()
-
-
-
 def compare_mlines_ctu():
 
     from pylab import show
@@ -65,6 +47,7 @@ def compare_mlines_ctu():
     visual.shocktube(P0, label='method of lines, RK3', linestyle='--', mfc='None')
     visual.shocktube(P1, label='CTU, first order    ', linestyle='-.', mfc='None')
     visual.show()
+
 
 
 def compare_reconstruct():
@@ -228,8 +211,10 @@ def cylindrical_blast():
     from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
 
+    B = {'B':[0,0,0]}
+
     driver = ProblemDriver(N=(132,132), L=(2,2))
-    problem = RMHDCylindricalA(pre=100.0)
+    problem = RMHDCylindricalA(pre=100.0, I=B, O=B)
     state = LibraryState(plm_theta=2.0, mode_reconstruct=2, mode_riemann_solver=1)
 
     run_args = {'name': "cylindrical blast wave",
@@ -265,7 +250,7 @@ def symmetry_test():
     names       = ['3vel, quartic exact', '3vel, quartic none',
                    '4vel, quartic exact', '4vel, quartic none']
     runnum      = range(1,5)
-    run_args    = {'RK_order': 3, 'CFL': 0.2, 'tfinal': 0.2}
+    run_args    = {'RK_order': 3, 'CFL': 0.4, 'tfinal': 0.2}
 
     def do_sym(P, name):
 
@@ -278,13 +263,13 @@ def symmetry_test():
         title(name)
 
 
-    for num,n,q,r in zip(runnum, names, quartic, reconstruct):
+    for num,name,q,r in zip(runnum, names, quartic, reconstruct):
 
         state = LibraryState(mode_quartic_solver=q, mode_reconstruct=r)
-        P = driver.run(_lib, state, problem, name=n, **run_args)
+        P = driver.run(_lib, state, problem, name=name, **run_args)
 
         subplot(2,2,num)
-        do_sym(P, n)
+        do_sym(P, name)
 
     show()
 
@@ -399,10 +384,9 @@ if __name__ == "__main__":
         analyze_failed_state(args[0])
 
     else:
-        sr_2d_explosion()
         #sr_shocktube()
         #riemann_wave_pattern()
-        #cylindrical_blast()
+        cylindrical_blast()
         #quadrant_problem()
         #spherical_blast_3d()
         #symmetry_test()
