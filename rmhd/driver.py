@@ -62,7 +62,7 @@ class ProblemDriver:
                         U[ 0:Ng   ] = U[   Ng  ] # Boundary conditions
                         U[Nx-Ng:Nx] = U[Nx-Ng-1]
 
-                        self.failures += self.lib.advance_U_ctu_1d_2nd_order(U,dt)
+                        self.failures += self.lib.advance_U_CTU_CellCenteredB_1d(U,dt)
 
                     elif len(self.N) is 2:
 
@@ -77,8 +77,24 @@ class ProblemDriver:
                             U[:,   i  ] = U[:,   Ng  ]
                             U[:,Ny-i-1] = U[:,Ny-Ng-1]
 
-                        self.failures += self.lib.advance_U_ctu_2d_2nd_order(U,dt)
+                        self.failures += self.lib.advance_U_CTU_CellCenteredB_2d(U,dt)
 
+                    elif len(self.N) is 3:
+
+                        Ng = self.Ng
+                        Nx,Ny,Nz = self.N
+
+                        for i in range(Ng): # Boundary conditions
+                            U[   i  ,:,:,:] = U[   Ng  ,:,:,:]
+                            U[Nx-i-1,:,:,:] = U[Nx-Ng-1,:,:,:]
+
+                            U[:,   i  ,:,:] = U[:,   Ng  ,:,:]
+                            U[:,Ny-i-1,:,:] = U[:,Ny-Ng-1,:,:]
+
+                            U[:,:,   i  ,:] = U[:,:,   Ng  ,:]
+                            U[:,:,Nz-i-1,:] = U[:,:,Nz-Ng-1,:]
+
+                        self.failures += self.lib.advance_U_CTU_CellCenteredB_3d(U,dt)
 
             except LibraryFailure, e:
 

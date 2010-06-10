@@ -132,7 +132,6 @@ def riemann_wave_pattern():
     from rmhd import _lib, visual, LibraryState
     from rmhd.driver import ProblemDriver
 
-
     Nx = 512
     x = linspace(-2.0,2.0,Nx)
     F, U, P, Ul, Ur = zeros(8),zeros(8),zeros(8),zeros(8),zeros(8)
@@ -211,14 +210,16 @@ def cylindrical_blast():
     from rmhd import _lib, LibraryState, visual
     from rmhd.driver import ProblemDriver
 
-    B = {'B':[0,0,0]}
+    B = {'B':[1,1,0]}
 
-    driver = ProblemDriver(N=(132,132), L=(2,2))
+    driver = ProblemDriver(N=(128,128), L=(2,2))
     problem = RMHDCylindricalA(pre=100.0, I=B, O=B)
     state = LibraryState(plm_theta=2.0, mode_reconstruct=2, mode_riemann_solver=1)
 
+    driver.raise_on_failure = False
+
     run_args = {'name': "cylindrical blast wave",
-                'RK_order': 3, 'CFL': 0.6, 'tfinal': 0.2}
+                'RK_order': 3, 'CFL': 0.6, 'tfinal': 0.8}
 
     P = driver.run(_lib, state, problem, **run_args)
 
@@ -326,9 +327,9 @@ def spherical_blast_3d():
 
     problem = RMHDCylindricalA( I=B, O=B )
     driver = ProblemDriver(N=(32,32,32), L=(2,2,2))
-    state = LibraryState(mode_riemann_solver=1, mode_reconstruct=1)
+    state = LibraryState(mode_riemann_solver=0, mode_reconstruct=1)
 
-    run_args = {'RK_order': 3, 'CFL': 0.05, 'tfinal': 0.3}
+    run_args = {'RK_order': 4, 'CFL': 0.5, 'tfinal': 0.3}
     P = driver.run(_lib, state, problem, **run_args)
     visual.four_pane_2d(P[:,:,16], extent=[-1,1,-1,1])
     visual.show()
@@ -386,9 +387,9 @@ if __name__ == "__main__":
     else:
         #sr_shocktube()
         #riemann_wave_pattern()
-        cylindrical_blast()
+        #cylindrical_blast()
         #quadrant_problem()
-        #spherical_blast_3d()
+        spherical_blast_3d()
         #symmetry_test()
 
         #compare_riemann_solver()
