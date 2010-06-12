@@ -5,10 +5,12 @@
 if __name__ == "__main__":
 
     from numpy.distutils.core import setup, Extension
-    from os import listdir
 
-    srcrmhd = ['src/rmhd.c', 'src/quartic.c', 'src/hllc_rmhd.c']
-    librmhd = Extension('librmhd', srcrmhd, extra_compile_args=["-Wall"])
-    sr_riemann = Extension('sr_riemann', ['src/sr_riemann.f', 'src/sr_riemann-vt.f'])
+    srceulr = ['src/integrate.c', 'src/euler.c', 'src/hll.c']
 
-    setup(name='rmhd', ext_modules=[librmhd, sr_riemann])
+    ext_euler = Extension(name               = 'euler',
+                          sources            = srceulr,
+                          define_macros      = [('NQ',5)],
+                          extra_compile_args = ["-Wall", "-O3"])
+
+    setup(name='python-mhd', ext_modules=[ext_euler])

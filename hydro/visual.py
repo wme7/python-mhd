@@ -84,7 +84,7 @@ def four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, cmap=None, **kwargs):
     """
 
 
-def shocktube(P, x=(0,1), **kwargs):
+def mhd_shocktube(P, x=(0,1), **kwargs):
 
     from pylab import sqrt, linspace, subplot, plot, text, xlabel, figure, show
     from pylab import subplots_adjust, setp, gca, LinearLocator, rcParams, legend
@@ -106,33 +106,75 @@ def shocktube(P, x=(0,1), **kwargs):
 
     ax = subplot(2,3,1)
     plot(X,rho, **plot_args)
-    text(0.9,0.9, r"$\rho$", transform = ax.transAxes, fontsize=20)
-    #setp(ax.get_xticklabels(), visible=False)
+    text(0.9,0.85, r"$\rho$", transform = ax.transAxes, fontsize=20)
+    setp(ax.get_xticklabels(), visible=False)
     if 'label' in plot_args: legend(loc='upper left')
 
     ax = subplot(2,3,2)
     plot(X,pre, **plot_args)
-    text(0.9,0.9, r"$P$", transform = ax.transAxes, fontsize=20)
-    #setp(ax.get_xticklabels(), visible=False)
+    text(0.9,0.85, r"$P$", transform = ax.transAxes, fontsize=20)
+    setp(ax.get_xticklabels(), visible=False)
 
     ax = subplot(2,3,3)
     plot(X, g, **plot_args)
-    text(0.9,0.9, r"$\gamma$", transform = ax.transAxes, fontsize=20)
-    #setp(ax.get_xticklabels(), visible=False)
+    text(0.9,0.85, r"$\gamma$", transform = ax.transAxes, fontsize=20)
+    setp(ax.get_xticklabels(), visible=False)
 
     ax = subplot(2,3,4)
     plot(X, vx, **plot_args)
-    text(0.9,0.9, r"$v_x$", transform = ax.transAxes, fontsize=20)
+    text(0.9,0.85, r"$v_x$", transform = ax.transAxes, fontsize=20)
     xlabel(r"$x$")
 
     ax = subplot(2,3,5)
     plot(X, vy, **plot_args)
-    text(0.9,0.9, r"$v_y$", transform = ax.transAxes, fontsize=20)
+    text(0.9,0.85, r"$v_y$", transform = ax.transAxes, fontsize=20)
     xlabel(r"$x$")
 
     ax = subplot(2,3,6)
     plot(X, By, **plot_args)
-    text(0.9,0.9, r"$B_y$", transform = ax.transAxes, fontsize=20)
+    text(0.9,0.85, r"$B_y$", transform = ax.transAxes, fontsize=20)
+    xlabel(r"$x$")
+
+    subplots_adjust(hspace=0.15)
+
+
+def hyd_shocktube(P, x=(0,1), **kwargs):
+
+    from pylab import sqrt, linspace, subplot, plot, text, xlabel, figure, show
+    from pylab import subplots_adjust, setp, gca, LinearLocator, rcParams, legend
+
+    rho, pre   = P[:,0], P[:,1]
+    vx, vy, vz = P[:,2], P[:,3], P[:,4]
+
+    plot_args = { }
+    plot_args['marker'] = kwargs.get('marker', 'o')
+    plot_args['c'     ] = kwargs.get('c'     , 'k')
+    plot_args['mfc'   ] = kwargs.get('mfc'   , 'None')
+
+    plot_args.update(kwargs)
+    rcParams.update({'axes.labelsize':16, 'ytick.major.pad':8})
+
+    X = linspace(x[0],x[1],P.shape[0])
+
+    ax = subplot(2,2,1)
+    plot(X,rho, **plot_args)
+    text(0.9,0.85, r"$\rho$", transform = ax.transAxes, fontsize=20)
+    setp(ax.get_xticklabels(), visible=False)
+    if 'label' in plot_args: legend(loc='upper left')
+
+    ax = subplot(2,2,2)
+    plot(X,pre, **plot_args)
+    text(0.9,0.85, r"$P$", transform = ax.transAxes, fontsize=20)
+    setp(ax.get_xticklabels(), visible=False)
+
+    ax = subplot(2,2,3)
+    plot(X, vx, **plot_args)
+    text(0.9,0.85, r"$v_x$", transform = ax.transAxes, fontsize=20)
+    xlabel(r"$x$")
+
+    ax = subplot(2,2,4)
+    plot(X, vy, **plot_args)
+    text(0.9,0.85, r"$v_y$", transform = ax.transAxes, fontsize=20)
     xlabel(r"$x$")
 
     subplots_adjust(hspace=0.15)

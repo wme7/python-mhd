@@ -1,0 +1,62 @@
+
+
+
+class EulersEquationsSolver:
+
+
+    def __init__(self, **kwargs):
+
+        from ctypes import CDLL, POINTER, Structure, c_double, c_int
+        from numpy import float64, int32
+        from numpy.ctypeslib import ndpointer
+        from sys import path
+        from os.path import abspath, dirname
+        from os import popen
+
+        dbl_arr = ndpointer(dtype=float64, flags=('C_CONTIGUOUS', 'WRITEABLE'))
+        dbl_vec = ndpointer(dtype=float64, flags=('C_CONTIGUOUS'))
+        int_vec = ndpointer(dtype=int32  , flags=('C_CONTIGUOUS'))
+
+        lib_home = dirname(abspath(popen('find . -name *.so').readline()))
+        lib = CDLL(lib_home+'/euler.so')
+
+        self.schemes = ['fwd_euler', 'midpoint', 'RK3']
+        self.ghost_cells = dict(zip(self.schemes,(2,4,6)))
+        self.advance = { }
+        self.NumComponents = 5
+
+        for sname in self.schemes:
+            self.advance[sname] = lib.__getattr__('advance_state_'+sname)
+            self.advance[sname].argtypes = [dbl_arr, c_double]
+
+        lib.integrate_init.argtypes = [ int_vec, dbl_vec, c_int ]
+
+        self._clib = lib
+        self.new_problem(**kwargs)
+
+
+    def new_problem(self, N=[256], L=[1.0], scheme='midpoint'):
+
+        from numpy import zeros, ones, int32
+        assert scheme in self.schemes
+
+        N_grid, L_grid = ones(4, dtype=int32), zeros(4)
+
+        N_grid[0] = self.ghost_cells[scheme]
+        num_dims = len(N)
+
+        N_grid[1:1+num_dims] = N
+        L_grid[1:1+num_dims] = L
+
+        self._clib.integrate_init(N_grid, L_grid, num_dims)
+        self.scheme = scheme
+        self.N = N
+        self.L = L
+
+
+    def advance_state(self, P, dt):
+        self.advance[self.scheme](P, dt)
+
+
+    def get_Ng(self):
+        return self.ghost_cells[self.scheme]

@@ -399,8 +399,8 @@ int reconstruct_use_4vel(const double *P0,
   for (i=0; i<8; ++i)
     if (i==rho || i==pre || i==Bx || i==By || i==Bz)
       {
-        Pr[i] = P0[S+i] - 0.5 * plm_minmod(P0[ 0+i], P0[S+i], P0[T+i]);
-        Pl[i] = P0[0+i] + 0.5 * plm_minmod(P0[-S+i], P0[0+i], P0[S+i]);
+        Pr[i] = P0[S+i] - 0.5 * slope_limiter(P0[ 0+i], P0[S+i], P0[T+i]);
+        Pl[i] = P0[0+i] + 0.5 * slope_limiter(P0[-S+i], P0[0+i], P0[S+i]);
       }
 
   const double ux_r = ux[U] - 0.5 * slope_limiter(ux[ 0], ux[U], ux[V]);
