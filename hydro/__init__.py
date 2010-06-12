@@ -24,8 +24,8 @@ class HydrodynamicsSolver:
         lib_home = dirname(abspath(popen('find . -name *.so').readline()))
         lib = CDLL(lib_home+'/'+self.libname+'.so')
 
-        self.schemes = ['fwd_euler', 'midpoint', 'RK3']
-        self.ghost_cells = dict(zip(self.schemes,(2,4,6)))
+        self.schemes = ['fwd_euler', 'midpoint', 'RK3', 'ctu_hancock']
+        self.ghost_cells = dict(zip(self.schemes,(2,4,6,4)))
         self.advance = { }
 
         for sname in self.schemes:

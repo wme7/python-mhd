@@ -49,7 +49,7 @@ if __name__ == "__main__":
     from hydro.testbench import *
     from hydro import visual
 
-    solver = RMHDEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
+    solver = RMHDEquationsSolver(N=[256], L=[1.0], scheme='ctu_hancock')
     #solver = EulersEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
     problem = SRShockTube1()
 
