@@ -44,17 +44,18 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
 
 if __name__ == "__main__":
 
-    from hydro import EulersEquationsSolver
+    from hydro import EulersEquationsSolver, RMHDEquationsSolver
     from numpy import array, zeros
     from hydro.testbench import *
     from hydro import visual
 
-    solver = EulersEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
+    solver = RMHDEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
+    #solver = EulersEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
     problem = SRShockTube1()
 
     P = run_problem(solver, problem, quiet=False, CFL=0.1, tfinal=0.2)
 
     from pylab import plot, show, legend
 
-    visual.hyd_shocktube(P)
+    visual.shocktube(P)
     show()

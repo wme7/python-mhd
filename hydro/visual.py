@@ -1,4 +1,5 @@
 
+
 def contour_2d(P, fig, extent=[0,1,0,1], caption=None):
 
     assert len(P.shape) is 2
@@ -82,6 +83,12 @@ def four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, cmap=None, **kwargs):
     See link for examples on how to use quiver:
     http://matplotlib.sourceforge.net/examples/pylab_examples/quiver_demo.html
     """
+
+
+def shocktube(P, *args, **kwargs):
+
+    if P.shape[-1] is 5: hyd_shocktube(P, *args, **kwargs)
+    if P.shape[-1] is 8: mhd_shocktube(P, *args, **kwargs)
 
 
 def mhd_shocktube(P, x=(0,1), **kwargs):

@@ -1,10 +1,14 @@
 
 
 
-class EulersEquationsSolver:
+class HydrodynamicsSolver:
+
+    def __init__(self):
+
+        raise NotImplementedError
 
 
-    def __init__(self, **kwargs):
+    def _loadlib_(self, **kwargs):
 
         from ctypes import CDLL, POINTER, Structure, c_double, c_int
         from numpy import float64, int32
@@ -18,12 +22,11 @@ class EulersEquationsSolver:
         int_vec = ndpointer(dtype=int32  , flags=('C_CONTIGUOUS'))
 
         lib_home = dirname(abspath(popen('find . -name *.so').readline()))
-        lib = CDLL(lib_home+'/euler.so')
+        lib = CDLL(lib_home+'/'+self.libname+'.so')
 
         self.schemes = ['fwd_euler', 'midpoint', 'RK3']
         self.ghost_cells = dict(zip(self.schemes,(2,4,6)))
         self.advance = { }
-        self.NumComponents = 5
 
         for sname in self.schemes:
             self.advance[sname] = lib.__getattr__('advance_state_'+sname)
@@ -48,7 +51,7 @@ class EulersEquationsSolver:
         N_grid[1:1+num_dims] = N
         L_grid[1:1+num_dims] = L
 
-        self._clib.integrate_init(N_grid, L_grid, num_dims)
+        self._clib.integrate_init(N_grid, L_grid, self.NumComponents, num_dims)
         self.scheme = scheme
         self.N = N
         self.L = L
@@ -60,3 +63,22 @@ class EulersEquationsSolver:
 
     def get_Ng(self):
         return self.ghost_cells[self.scheme]
+
+
+
+class EulersEquationsSolver(HydrodynamicsSolver):
+
+    def __init__(self, **kwargs):
+
+        self.libname = 'euler'
+        self.NumComponents = 5
+        self._loadlib_(**kwargs)
+
+
+class RMHDEquationsSolver(HydrodynamicsSolver):
+
+    def __init__(self, **kwargs):
+
+        self.libname = 'rmhd'
+        self.NumComponents = 8
+        self._loadlib_(**kwargs)

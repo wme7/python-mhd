@@ -133,11 +133,11 @@ int prim_to_cons_array(const double *P, double *U, int N)
 }
 
 
-int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
+int constrained_transport_2d(double *Fx, double *Fy, int stride[4])
 {
   return 0;
 }
-int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
+int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4])
 {
   return 0;
 }

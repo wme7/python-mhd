@@ -29,15 +29,15 @@ int flux_and_eval(const double *U, const double *P, double *F,
 		  double *ap, double *am, int dim);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
-
+extern int NQ;
 
 /*------------------------------------------------------------------------------
  *
  * Private Data
  *
  */
+#define MAXNQ 8 // Used for static array initialization
 static double max_lambda=0.0;
-
 
 /*------------------------------------------------------------------------------
  *
@@ -58,9 +58,9 @@ int hll_flux(const double *pl, const double *pr, double *U, double *F,
 {
   int i;
   double epl, epr, eml, emr;
-  double Ul[NQ], Ur[NQ];
-  double Pl[NQ], Pr[NQ];
-  double Fl[NQ], Fr[NQ];
+  double Ul[MAXNQ], Ur[MAXNQ];
+  double Pl[MAXNQ], Pr[MAXNQ];
+  double Fl[MAXNQ], Fr[MAXNQ];
 
   memcpy(Pl,pl,NQ*sizeof(double));
   memcpy(Pr,pr,NQ*sizeof(double));
@@ -77,7 +77,7 @@ int hll_flux(const double *pl, const double *pr, double *U, double *F,
   double ml = (fabs(am)<fabs(ap)) ? fabs(ap) : fabs(am);
   if (max_lambda < ml) max_lambda = ml;
 
-  double F_hll[NQ], U_hll[NQ];
+  double F_hll[MAXNQ], U_hll[MAXNQ];
   for (i=0; i<NQ; ++i)
     {
       U_hll[i] = (ap*Ur[i] - am*Ul[i] +       (Fl[i] - Fr[i])) / (ap - am);

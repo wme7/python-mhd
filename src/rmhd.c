@@ -94,7 +94,7 @@ void set_adiabatic_gamma(double g)
   adiabatic_gamma = g;
 }
 
-int rmhd_flux_and_eval(const double *U, const double *P, double *F,
+int flux_and_eval(const double *U, const double *P, double *F,
 		       double *ap, double *am, int dim)
 {
   const double v2   =   P[vx]*P[vx] + P[vy]*P[vy] + P[vz]*P[vz];
@@ -177,11 +177,11 @@ int rmhd_flux_and_eval(const double *U, const double *P, double *F,
   const double A1 = -4*K*V3 - L*vi*2     - 2*b0*bi;
   const double A0 =    K*V4 + L*V2       +   bi*bi;
 
-  new_QuarticEquation(A4,A3,A2,A1,A0);
+  quartic_equation_init(A4,A3,A2,A1,A0);
 
   double r1, r2, r3, r4;
   int nr12, nr34;
-  int nr = solve_quartic_equation(&r1, &r2, &r3, &r4, &nr12, &nr34);
+  int nr = quartic_equation_solve_exact(&r1, &r2, &r3, &r4, &nr12, &nr34);
 
   double ap12 = (r1>r2) ? r1 : r2;
   double ap34 = (r3>r4) ? r3 : r4;
@@ -272,6 +272,7 @@ int cons_to_prim_point(const double *U, double *P)
       Z = Z_new;
       W = W_new;
 
+      if (verbose) {  }
       if (fabs(dZ/Z) + fabs(dW/W) < ERROR_TOLR)
         {
           if (Pre>=PRES_FLOOR)
