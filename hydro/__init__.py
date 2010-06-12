@@ -35,27 +35,30 @@ class HydrodynamicsSolver:
         lib.integrate_init.argtypes = [ int_vec, dbl_vec, c_int ]
 
         self._clib = lib
-        self.new_problem(**kwargs)
+        self.kwargs = kwargs
 
 
-    def new_problem(self, N=[256], L=[1.0], scheme='midpoint'):
+    def new_problem(self):
 
         from numpy import zeros, ones, int32
-        assert scheme in self.schemes
+
+        self.scheme = self.kwargs['scheme']
+        assert self.scheme in self.schemes
+
+        N = self.kwargs['N']
+        L = self.kwargs['L']
 
         N_grid, L_grid = ones(4, dtype=int32), zeros(4)
-
-        N_grid[0] = self.ghost_cells[scheme]
+        N_grid[0] = self.ghost_cells[self.scheme]
         num_dims = len(N)
 
         N_grid[1:1+num_dims] = N
         L_grid[1:1+num_dims] = L
 
-        self._clib.integrate_init(N_grid, L_grid, self.NumComponents, num_dims)
-        self.scheme = scheme
         self.N = N
         self.L = L
 
+        self._clib.integrate_init(N_grid, L_grid, self.NumComponents, num_dims)
 
     def advance_state(self, P, dt):
         self.advance[self.scheme](P, dt)

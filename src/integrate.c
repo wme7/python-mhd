@@ -17,10 +17,10 @@
  *
  */
 int integrate_init(int N[4], double L[4], int num_comp, int num_dims);
-int advance_state_fwd_euler  (double *P, double dt);
-int advance_state_midpoint   (double *P, double dt);
-int advance_state_RK3        (double *P, double dt);
-int advance_state_ctu_hancock    (double *P, double dt);
+int advance_state_fwd_euler   (double *P, double dt);
+int advance_state_midpoint    (double *P, double dt);
+int advance_state_RK3         (double *P, double dt);
+int advance_state_ctu_hancock (double *P, double dt);
 
 /*------------------------------------------------------------------------------
  *

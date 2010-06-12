@@ -7,6 +7,7 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
 
     if name is None: name = problem.__class__
 
+    solver.new_problem()
     P  = problem.initial_model(solver.N, solver.NumComponents)
     t  = 0.0
     dt = 1e-9
