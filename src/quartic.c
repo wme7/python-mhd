@@ -1,13 +1,45 @@
 
+/*------------------------------------------------------------------------------
+ * FILE: quartic.c
+ *
+ * AUTHOR: Jonathan Zrake, NYU CCPP: zrake@nyu.edu
+ *         Adapted from the nvwa code by Weiqun Zhang
+ *
+ *------------------------------------------------------------------------------
+ */
+
 #include <math.h>
 
-double d4,d3,d2,d1,d0;
+/*------------------------------------------------------------------------------
+ *
+ * Public Interface
+ *
+ */
+int quartic_equation_init(double d4, double d3, double d2, double d1, double d0);
+int quartic_equation_solve_apprx(double *x);
+int quartic_equation_solve_exact(double *r1, double *r2, double *r3, double *r4,
+				 int *nr12, int *nr34);
 
-int new_QuarticEquation(double D4, double D3, double D2, double D1, double D0)
-{
-  d4=D4; d3=D3; d2=D2; d1=D1; d0=D0;
-  return 0;
-}
+/*------------------------------------------------------------------------------
+ *
+ * Private Data
+ *
+ */
+static double d4,d3,d2,d1,d0;
+
+/*------------------------------------------------------------------------------
+ *
+ * Internal Dependecies
+ *
+ */
+static int solve_cubic_equation(double  c3, double  c2,  double c1, double c0,
+				double *x1, double *x2, double *x3);
+
+/*------------------------------------------------------------------------------
+ *
+ * Inline functions
+ *
+ */
 static inline double evaluate_f(double x)
 {
   double x2 = x*x;
@@ -21,16 +53,39 @@ static inline double evaluate_dfdx(double x)
   double x3 = x*x2;
   return 4*d4*x3 + 3*d3*x2 + 2*d2*x + d1;
 }
-static inline double evaluate_df2dx2(double x)
+
+/*------------------------------------------------------------------------------
+ *
+ * Public Functions Definitions
+ *
+ */
+int quartic_equation_init(double D4, double D3, double D2, double D1, double D0)
 {
-  double x2 = x*x;
-  return 12*d4*x2 + 6*d3*x + 2*d2;
+  d4=D4; d3=D3; d2=D2; d1=D1; d0=D0;
+  return 0;
 }
 
-int solve_cubic_equation(double  c3, double  c2,  double c1, double c0,
-                         double *x1, double *x2, double *x3);
-int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
-                           int *nr12, int *nr34)
+int quartic_equation_solve_apprx(double *x)
+{
+  static const double ERROR_TOLR = 1e-14;
+  static const int NEWTON_MAX_ITER = 10;
+
+  double f,g;
+  int n_iter=0;
+
+  f = evaluate_f(*x);
+  while (fabs(f) > ERROR_TOLR)
+    {
+      f = evaluate_f(*x);
+      g = evaluate_dfdx(*x);
+      *x -= f/g;
+      if (++n_iter > NEWTON_MAX_ITER) return 1;
+    }
+
+  return 0;
+}
+int quartic_equation_solve_exact(double *r1, double *r2, double *r3, double *r4,
+				 int *nr12, int *nr34)
 {
   double a3 = d3/d4;
   double a2 = d2/d4;
@@ -96,6 +151,12 @@ int solve_quartic_equation(double *r1, double *r2, double *r3, double *r4,
   return *nr12 + *nr34;
 }
 
+
+/*------------------------------------------------------------------------------
+ *
+ * Private Functions Definitions
+ *
+ */
 int solve_cubic_equation(double  c3, double  c2,  double c1, double c0,
                          double *x1, double *x2, double *x3)
 {
@@ -141,45 +202,4 @@ int solve_cubic_equation(double  c3, double  c2,  double c1, double c0,
 
       return 3;
     }
-}
-
-int solve_quartic_approx1(double *x)
-{
-  static const double ERROR_TOLR = 1e-14;
-  static const int NEWTON_MAX_ITER = 10;
-
-  double f,g;
-  int n_iter=0;
-
-  f = evaluate_f(*x);
-  while (fabs(f) > ERROR_TOLR)
-    {
-      f = evaluate_f(*x);
-      g = evaluate_dfdx(*x);
-      *x -= f/g;
-      if (++n_iter > NEWTON_MAX_ITER) return 1;
-    }
-
-  return 0;
-}
-int solve_quartic_approx2(double *x)
-{
-  static const double ERROR_TOLR = 1e-14;
-  static const int NEWTON_MAX_ITER = 10;
-
-  double f,g,h;
-  int n_iter=0;
-
-  n_iter = 0;
-  f = evaluate_f(*x);
-  while (fabs(f) > ERROR_TOLR)
-    {
-      f = evaluate_f(*x);
-      g = evaluate_dfdx(*x);
-      h = evaluate_df2dx2(*x);
-      *x -= (f*g) / (g*g - f*h);
-      if (++n_iter > NEWTON_MAX_ITER) return 1;
-    }
-
-  return 0;
 }

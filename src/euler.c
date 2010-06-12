@@ -4,9 +4,12 @@
  *
  * AUTHOR: Jonathan Zrake, NYU CCPP: zrake@nyu.edu
  *
+ * REFERENCES:
+ *
  *------------------------------------------------------------------------------
  */
 
+#include <stdlib.h>
 #include <memory.h>
 #include <math.h>
 
@@ -23,6 +26,9 @@ int cons_to_prim_point(const double *U, double *P);
 int prim_to_cons_array(const double *P, double *U, int N);
 int cons_to_prim_array(const double *U, double *P, int N);
 
+int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
+int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
+
 /*------------------------------------------------------------------------------
  *
  * Private Data
@@ -32,7 +38,6 @@ enum { rho, nrg, px, py, pz }; // Conserved
 enum { RHO, pre, vx, vy, vz }; // Primitive
 
 static double adiabatic_gamma=1.4;
-
 
 /*------------------------------------------------------------------------------
  *
@@ -128,11 +133,11 @@ int prim_to_cons_array(const double *P, double *U, int N)
 }
 
 
-int constrained_transport_2d(double *Fx, double *Fy)
+int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
 {
   return 0;
 }
-int constrained_transport_3d(double *Fx, double *Fy, double *Fz)
+int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
 {
   return 0;
 }

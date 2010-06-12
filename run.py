@@ -4,7 +4,6 @@
 def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
 
     from time import time
-    from numpy import zeros_like
 
     if name is None: name = problem.__class__
 
@@ -38,8 +37,6 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
 
         dt = CFL * min_dx
 
-
-
     print "Python driver finished '%s'... total time: %f" % (name, time() - start_time)
     return P
 
@@ -52,7 +49,7 @@ if __name__ == "__main__":
     from hydro.testbench import *
     from hydro import visual
 
-    solver = EulersEquationsSolver(N=[256], L=[1.0])
+    solver = EulersEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
     problem = SRShockTube1()
 
     P = run_problem(solver, problem, quiet=False, CFL=0.1, tfinal=0.2)
