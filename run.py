@@ -4,6 +4,7 @@
 def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
 
     from time import time
+    from hydro.parallel import DecomposedDomain
 
     if name is None: name = problem.__class__
 
@@ -16,6 +17,9 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
     Ng = solver.get_Ng()
     Nx = P.shape[0]
 
+    x0, x1 = (0.0,), (1.0,)
+    domain = DecomposedDomain((Nx,), x0, x1, Ng)
+
     min_dx = min([L/N for L,N in zip(solver.L, solver.N)])
 
     start_time = time()
@@ -24,8 +28,11 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
         nc += 1
         start = time()
 
+        domain.synchronize(P)
+        """
         P[ 0:Ng   ] = P[   Ng  ] # Boundary conditions
         P[Nx-Ng:Nx] = P[Nx-Ng-1]
+        """
 
         solver.advance_state(P,dt)
 
@@ -57,7 +64,7 @@ if __name__ == "__main__":
 
     problem = SRShockTube1()
 
-    P = run_problem(solver, problem, quiet=False, CFL=0.1, tfinal=0.2)
+    P = run_problem(solver, problem, quiet=True, CFL=0.1, tfinal=0.2)
 
     from pylab import plot, show, legend
 

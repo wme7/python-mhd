@@ -4,7 +4,7 @@
 
 if __name__ == "__main__":
 
-    from numpy.distutils.core import setup, Extension
+    from distutils.core import setup, Extension
 
     srcscalar = ['integrate.c', 'hll.c', 'scalar.c']
     srceuler  = ['integrate.c', 'hll.c', 'euler.c']
