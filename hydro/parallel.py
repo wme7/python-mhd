@@ -38,6 +38,7 @@ class DecomposedDomain():
         self.Ng = Ng
         self.cart = cart
         self.mpi_coord = mpi_coord
+        self.mpi_sizes = mpi_sizes
 
 
     def synchronize(self, A):
@@ -45,12 +46,12 @@ class DecomposedDomain():
         from mpi4py.MPI import COMM_WORLD, Compute_dims
         Ng = self.Ng
 
-        if len(A.shape) is 2:
+        if len(A.shape) == 2:
             L,R = self.cart.Shift(0,1)
             A[:+Ng] = self.cart.Sendrecv(A[-2*Ng:-Ng], dest=R, source=L)
             A[-Ng:] = self.cart.Sendrecv(A[+Ng:+2*Ng], dest=L, source=R)
 
-        if len(A.shape) is 3:
+        if len(A.shape) == 3:
             L,R = self.cart.Shift(1,1)
             A[:,:+Ng] = self.cart.Sendrecv(A[:,-2*Ng:-Ng], dest=R, source=L)
             A[:,-Ng:] = self.cart.Sendrecv(A[:,+Ng:+2*Ng], dest=L, source=R)
@@ -59,7 +60,7 @@ class DecomposedDomain():
             A[:+Ng,:] = self.cart.Sendrecv(A[-2*Ng:-Ng,:], dest=R, source=L)
             A[-Ng:,:] = self.cart.Sendrecv(A[+Ng:+2*Ng,:], dest=L, source=R)
 
-        if len(A.shape) is 4:
+        if len(A.shape) == 4:
             L,R = self.cart.Shift(0,1)
             A[:+Ng,:,:] = self.cart.Sendrecv(A[-2*Ng:-Ng,:,:], dest=R, source=L)
             A[-Ng:,:,:] = self.cart.Sendrecv(A[+Ng:+2*Ng,:,:], dest=L, source=R)
@@ -71,3 +72,20 @@ class DecomposedDomain():
             L,R = self.cart.Shift(2,1)
             A[:,:,:+Ng] = self.cart.Sendrecv(A[:,:,-2*Ng:-Ng], dest=R, source=L)
             A[:,:,-Ng:] = self.cart.Sendrecv(A[:,:,+Ng:+2*Ng], dest=L, source=R)
+
+
+    def set_BC(self, A, BC=None):
+
+        self.synchronize(A)
+        if BC is None: return
+
+        L_BCs = BC.L_wall[len(A.shape)-2]
+        R_BCs = BC.R_wall[len(A.shape)-2]
+
+        for i,BC in enumerate(L_BCs):
+            if self.mpi_coord[i] == 0:
+                BC(A, self.Ng)
+
+        for i,BC in enumerate(R_BCs):
+            if self.mpi_coord[i] == self.mpi_sizes[i]-1:
+                BC(A, self.Ng)
