@@ -100,8 +100,8 @@ int flux_and_eval(const double *U, const double *P, double *F,
   const double v2   =   P[vx]*P[vx] + P[vy]*P[vy] + P[vz]*P[vz];
   const double B2   =   P[Bx]*P[Bx] + P[By]*P[By] + P[Bz]*P[Bz];
   const double Bv   =   P[Bx]*P[vx] + P[By]*P[vy] + P[Bz]*P[vz];
-  const double W    =   1.0 / sqrt(1.0 - v2);
-  const double W2   =   W*W;
+  const double W2   =   1.0 / (1.0 - v2);
+  const double W    =   sqrt(W2);
   const double b0   =   W*Bv;
   const double b2   =   (B2 + b0*b0) / W2;
   const double bx   =   (P[Bx] + b0 * W*P[vx]) / W;
@@ -194,8 +194,8 @@ int flux_and_eval(const double *U, const double *P, double *F,
 
   if (fabs(*ap)>1.0 || fabs(*am)>1.0)
     {
-      *am = -1.0;
       *ap =  1.0;
+      *am = -1.0;
     }
 
   return 0;

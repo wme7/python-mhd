@@ -78,6 +78,15 @@ class EulersEquationsSolver(HydrodynamicsSolver):
         self._loadlib_(**kwargs)
 
 
+class SRHDEquationsSolver(HydrodynamicsSolver):
+
+    def __init__(self, **kwargs):
+
+        self.libname = 'srhd'
+        self.NumComponents = 5
+        self._loadlib_(**kwargs)
+
+
 class RMHDEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):
