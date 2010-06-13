@@ -69,6 +69,16 @@ class HydrodynamicsSolver:
 
 
 
+
+class ScalarEquationsSolver(HydrodynamicsSolver):
+
+    def __init__(self, **kwargs):
+
+        self.libname = 'scalar'
+        self.NumComponents = 1
+        self._loadlib_(**kwargs)
+
+
 class EulersEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):

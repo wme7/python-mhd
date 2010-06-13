@@ -382,6 +382,7 @@ int advance_state_ctu_hancock(double *P, double dt)
      direction.
      ---------------------------------------------------------------------------------------
   */
+
   for (i=0; i<stride[0]-sx; i+=NQ)
     {
       double Pl[MAXNQ], Pr[MAXNQ];
@@ -417,6 +418,7 @@ int advance_state_ctu_hancock(double *P, double dt)
      danger of redundant calculations.
      ---------------------------------------------------------------------------------------
   */
+
   for (i=0; i<stride[0]; i+=NQ)
     {
       double PL[MAXNQ], PR[MAXNQ]; // Capital L/R refers to left and right interior walls of

@@ -160,7 +160,7 @@ int flux_and_eval(const double *U, const double *P, double *F,
       break;
     }
 
-  if (ap == 0 && am == 0) return 0; // User may skip eigenvalue calculation
+  if (ap == 0 || am == 0) return 0; // User may skip eigenvalue calculation
 
   const double W4   =  W2*W2;
   const double cs2  =  eos_cs2(P[rho],P[pre]);

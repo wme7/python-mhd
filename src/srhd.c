@@ -1,6 +1,6 @@
 
 /*------------------------------------------------------------------------------
- * FILE: euler.c
+ * FILE: srhd.c
  *
  * AUTHOR: Jonathan Zrake, NYU CCPP: zrake@nyu.edu
  *
@@ -101,6 +101,8 @@ int flux_and_eval(const double *U, const double *P, double *F,
       F[Sz ] = U[Sz ] * P[vz ] + P[pre];
       break;
     }
+
+  if (ap == 0 || am == 0) return 0; // User may skip eigenvalue calculation
 
   const double vx2 = P[vx]*P[vx];
   const double vy2 = P[vy]*P[vy];

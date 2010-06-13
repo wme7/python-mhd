@@ -45,14 +45,16 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
 
 if __name__ == "__main__":
 
-    from hydro import EulersEquationsSolver, RMHDEquationsSolver, SRHDEquationsSolver
+    from hydro import *
     from numpy import array, zeros
     from hydro.testbench import *
     from hydro import visual
 
     #solver = RMHDEquationsSolver(N=[256], L=[1.0], scheme='ctu_hancock')
     #solver = EulersEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
-    solver = SRHDEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
+    #solver = SRHDEquationsSolver(N=[256], L=[1.0], scheme='RK3')
+    solver = ScalarEquationsSolver(N=[256], L=[1.0], scheme='ctu_hancock')
+
     problem = SRShockTube1()
 
     P = run_problem(solver, problem, quiet=False, CFL=0.1, tfinal=0.2)
