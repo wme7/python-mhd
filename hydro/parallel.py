@@ -1,6 +1,6 @@
 
 
-class DecomposedDomain():
+class DistributedDomain():
 
     def __init__(self, N=(256,), x0=(0.0,), x1=(1.0,)):
         assert len(N) is len(x0) is len(x1)
@@ -41,7 +41,9 @@ class DecomposedDomain():
         self.rank = COMM_WORLD.rank
         self.mpi_coord = mpi_coord
         self.mpi_sizes = mpi_sizes
-
+        self.global_start = global_start
+        self.global_shape = global_shape
+        self.is_distributed = True
 
     def synchronize(self, A, Ng):
         from mpi4py.MPI import COMM_WORLD, Compute_dims
@@ -89,7 +91,10 @@ class DecomposedDomain():
             if self.mpi_coord[i] == self.mpi_sizes[i]-1:
                 BC(A, Ng)
 
-
     def dump(self, P, base='dump'):
-        fmt = '-'.join(['%03d' for m in self.mpi_coord]) % self.mpi_coord
-        P.dump(base+'_'+fmt+'.pk')
+        from pickle import dump
+        pickle_stream = open(base+'_%03d.pk' % self.rank, 'w')
+        tile = {'data': P, 'global_start': self.global_start}
+        dump(tile, pickle_stream)
+        pickle_stream.close()
+        self.cart.Barrier()

@@ -1,6 +1,5 @@
 
 
-
 class HydrodynamicsSolver:
 
     def __init__(self, scheme='midpoint'):
@@ -57,7 +56,6 @@ class HydrodynamicsSolver:
         self.advance[self.scheme](P, dt)
 
 
-
 class ScalarEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):
@@ -66,13 +64,12 @@ class ScalarEquationsSolver(HydrodynamicsSolver):
         HydrodynamicsSolver.__init__(self, **kwargs)
 
 
-
 class EulersEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):
         self.libname = 'euler'
         self.NumComponents = 5
-        self._loadlib_(**kwargs)
+        HydrodynamicsSolver.__init__(self, **kwargs)
 
 
 class SRHDEquationsSolver(HydrodynamicsSolver):
@@ -80,7 +77,7 @@ class SRHDEquationsSolver(HydrodynamicsSolver):
     def __init__(self, **kwargs):
         self.libname = 'srhd'
         self.NumComponents = 5
-        self._loadlib_(**kwargs)
+        HydrodynamicsSolver.__init__(self, **kwargs)
 
 
 class RMHDEquationsSolver(HydrodynamicsSolver):
@@ -88,5 +85,4 @@ class RMHDEquationsSolver(HydrodynamicsSolver):
     def __init__(self, **kwargs):
         self.libname = 'rmhd'
         self.NumComponents = 8
-        self._loadlib_(**kwargs)
-
+        HydrodynamicsSolver.__init__(self, **kwargs)

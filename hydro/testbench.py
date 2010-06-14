@@ -5,8 +5,39 @@ to_array = lambda S: [S['Rho'], S['Pre'],
                       S['B'][0], S['B'][1], S['B'][2]]
 
 
+class TestProblemBase:
 
-class CylindricalProblem:
+    def __init__(self):
+        raise NotImplementedError
+
+    def initial_model(self, domain, Ng, Nq):
+        from numpy import zeros, linspace, vectorize, zeros_like, newaxis as n
+        x0, x1, dx, N = domain.x0, domain.x1, domain.dx, domain.N
+        vfunc = vectorize(self.prim_at_point)
+
+        if len(domain.N) is 1:
+            X = linspace(x0[0]-Ng*dx[0], x1[0]+Ng*dx[0], N[0]+2*Ng)
+            Y = zeros_like(X)
+            Z = zeros_like(Y)
+
+        if len(domain.N) is 2:
+            X = linspace(x0[0]-Ng*dx[0], x1[0]+Ng*dx[0], N[0]+2*Ng)[:,n]
+            Y = linspace(x0[1]-Ng*dx[1], x1[1]+Ng*dx[1], N[1]+2*Ng)[n,:]
+            Z = zeros_like(Y)
+
+        if len(domain.N) is 3:
+            X = linspace(x0[0]-Ng*dx[0], x1[0]+Ng*dx[0], N[0]+2*Ng)[:,n,n]
+            Y = linspace(x0[1]-Ng*dx[1], x1[1]+Ng*dx[1], N[1]+2*Ng)[:,n,:]
+            Z = linspace(x0[2]-Ng*dx[2], x1[2]+Ng*dx[2], N[2]+2*Ng)[n,n,:]
+
+        P = zeros(tuple([n+2*Ng for n in domain.N])+(Nq,))
+        for i in range(Nq):
+            P[...,i] = vfunc(X,Y,Z,i)
+
+        return P
+
+
+class CylindricalProblem(TestProblemBase):
 
     def __init__(self, I={ }, O={ }, gamma=1.4):
         self._setup_()
@@ -14,49 +45,11 @@ class CylindricalProblem:
         self.O_state.update(O)
         self.adiabatic_gamma = gamma
 
-    def initial_model(self, N, Nq):
-        from numpy import sqrt, array, zeros_like, linspace, where, newaxis
-
-        P = zeros(tuple(N)+(Nq,))
-        if len(P.shape) is 3:
-            Nx, Ny, Nq = P.shape
-
-            X = linspace(-1,1,Nx)[:,newaxis]
-            Y = linspace(-1,1,Ny)[newaxis,:]
-
-            PI = zeros_like(P)
-            PO = zeros_like(P)
-
-            for i in range(Nq):
-                PI[:,:,i] = to_array(self.I_state)[i]
-                PO[:,:,i] = to_array(self.O_state)[i]
-
-            for i in range(Nq):
-                P[:,:,i] = where(sqrt(X**2 + Y**2) < 0.16,
-                                 PI[:,:,i], PO[:,:,i])
-
-        elif len(P.shape) is 4:
-            Nx, Ny, Nz, Nq = P.shape
-
-            X = linspace(-1,1,Nx)[:,newaxis,newaxis]
-            Y = linspace(-1,1,Ny)[newaxis,:,newaxis]
-            Z = linspace(-1,1,Nz)[newaxis,newaxis,:]
-
-            PI = zeros_like(P)
-            PO = zeros_like(P)
-
-            for i in range(Nq):
-                PI[:,:,:,i] = to_array(self.I_state)[i]
-                PO[:,:,:,i] = to_array(self.O_state)[i]
-
-            for i in range(Nq):
-                P[:,:,:,i] = where(sqrt(X**2 + Y**2 + Z**2) < 0.16,
-                                   PI[:,:,:,i], PO[:,:,:,i])
-
-        else:
-            print "Cylindrical setup only available in 2 or 3 dimensions!"
-            raise RuntimeWarning
-        return P
+    def prim_at_point(self, x,y,z,i):
+        I = self.I_state
+        O = self.O_state
+        r = (x**2 + y**2 + z**2)**0.5
+        return to_array(I)[i] if r<0.16 else to_array(O)[i]
 
 
 class RMHDCylindricalA(CylindricalProblem):
@@ -70,7 +63,7 @@ class RMHDCylindricalA(CylindricalProblem):
         self.O_state = { 'Rho':1.0, 'Pre':    0.01, 'v': [0,0,0], 'B': [4,0,0] }
 
 
-class QuadrantProblem:
+class QuadrantProblem(TestProblemBase):
 
     def __init__(self, NE={ }, NW={ }, SE={ }, SW={ }, gamma=1.4):
         self._setup_()
@@ -128,7 +121,7 @@ class SRQuadrantB(QuadrantProblem):
         self.NE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
 
 
-class ShockTubeProblem:
+class ShockTubeProblem(TestProblemBase):
 
     def __init__(self, L={ }, R={ }, gamma=1.4, orientation='x'):
         self._setup_()
@@ -137,27 +130,10 @@ class ShockTubeProblem:
         self.adiabatic_gamma = gamma
         self.orientation = orientation
 
-    def initial_model(self, domain, Ng, Nq):
-        from numpy import zeros, linspace, vectorize, array
-
-        X = linspace(domain.x0[0]-Ng*domain.dx[0],
-                     domain.x1[0]+Ng*domain.dx[0],
-                     domain.N[0]+2*Ng)
-        P = zeros(X.shape+(Nq,))
-
-        def prim_at_point(x,i):
-            L = self.L_state
-            R = self.R_state
-            return to_array(L)[i] if x<0.5 else to_array(R)[i]
-
-        vfunc = vectorize(prim_at_point)
-        for i in range(1):
-            P[:,i] = vfunc(X,i)
-
-        return P
-
-    def get_states(self):
-        return to_array(self.L_state), to_array(self.R_state)
+    def prim_at_point(self, x,y,z,i):
+        L = self.L_state
+        R = self.R_state
+        return to_array(L)[i] if x<0.5 else to_array(R)[i]
 
 
 class SRShockTube1(ShockTubeProblem):

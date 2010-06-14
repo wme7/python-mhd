@@ -23,7 +23,59 @@ def contour_2d(P, fig, extent=[0,1,0,1], caption=None):
         title(caption)
 
 
-def four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, cmap=None, **kwargs):
+def four_pane_2d(P, *args, **kwargs):
+
+    if P.shape[-1] is 1: scl_four_pane_2d(P, *args, **kwargs)
+    if P.shape[-1] is 5: hyd_four_pane_2d(P, *args, **kwargs)
+    if P.shape[-1] is 8: mhd_four_pane_2d(P, *args, **kwargs)
+
+
+def scl_four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, cmap=None, **kwargs):
+    pass
+
+def hyd_four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, cmap=None, **kwargs):
+
+    from pylab import flipud, subplot, title, colorbar, cm, imshow, quiver, matplotlib
+    from numpy import sqrt, linspace, meshgrid
+
+    rho, pre   = P[:,:,0], P[:,:,1]
+    vx, vy, vz = P[:,:,2], P[:,:,3], P[:,:,4]
+
+    if type(cmap) is str:
+        from pickle import load
+        cmap = load(open('rmhd/data/cmaps.pk'))[cmap]
+    elif isinstance(cmap, matplotlib.colors.Colormap):
+        pass
+    else:
+        cmap = cm.hot
+
+    imargs = {'extent':extent, 'cmap':cmap, 'interpolation':'bilinear'}
+    imargs.update(kwargs)
+
+    tr = lambda x: flipud(x.T)
+
+    subplot(2,2,1)
+    imshow(tr(rho), **imargs)
+    colorbar()
+    title("Density")
+
+    subplot(2,2,2)
+    imshow(tr(pre), **imargs)
+    colorbar()
+    title("Pressure")
+
+    subplot(2,2,3)
+    imshow(tr(vx), **imargs)
+    colorbar()
+    title("X-Velocity")
+
+    subplot(2,2,4)
+    imshow(tr(vy), **imargs)
+    colorbar()
+    title("Y-Velocity")
+
+
+def mhd_four_pane_2d(P, extent=[0,1,0,1], do_quiver=True, cmap=None, **kwargs):
 
     from pylab import flipud, subplot, title, colorbar, cm, imshow, quiver, matplotlib
     from numpy import sqrt, linspace, meshgrid
