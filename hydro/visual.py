@@ -118,7 +118,6 @@ def scl_shocktube(P, x=(0,1), **kwargs):
     ax = subplot(1,1,1)
     plot(X,rho, **plot_args)
     text(0.9,0.85, r"$\rho$", transform = ax.transAxes, fontsize=20)
-    setp(ax.get_xticklabels(), visible=False)
     if 'label' in plot_args: legend(loc='upper left')
 
 

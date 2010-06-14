@@ -1,27 +1,25 @@
 #!/usr/bin/env python
 
 
-def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
-
+def run_problem(solver, problem, domain, name=None, quiet=True, CFL=0.1, tfinal=0.2):
     from time import time
-    from hydro.parallel import DecomposedDomain
     from hydro.boundary import OutflowBoundary
 
     if name is None: name = problem.__class__
 
-    solver.new_problem()
-    P  = problem.initial_model(solver.N, solver.NumComponents)
+    solver.new_problem(domain)
+
+    Nq = solver.NumComponents
+    Ng = solver.NumGhostCells
+    P  = problem.initial_model(domain.N, Ng, Nq)
+
     t  = 0.0
     dt = 1e-9
     nc = 0
 
-    Ng = solver.get_Ng()
     Nx = P.shape[0]
-
-    x0, x1 = (0.0,), (1.0,)
-    domain = DecomposedDomain((Nx,), x0, x1, Ng)
     boundary = OutflowBoundary()
-    min_dx = min([L/N for L,N in zip(solver.L, solver.N)])
+    min_dx = min(domain.dx)
 
     start_time = time()
     while t < tfinal:
@@ -29,7 +27,7 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
         nc += 1
         start = time()
 
-        domain.set_BC(P, BC=boundary)
+        domain.set_BC(P, Ng, BC=None)
         solver.advance_state(P,dt)
 
         t += dt
@@ -42,27 +40,24 @@ def run_problem(solver, problem, name=None, quiet=True, CFL=0.1, tfinal=0.2):
         dt = CFL * min_dx
 
     print "Python driver finished '%s'... total time: %f" % (name, time() - start_time)
-    return P
+    return P[Ng:-Ng]
 
 
 
 if __name__ == "__main__":
-
     from hydro import *
     from numpy import array, zeros
     from hydro.testbench import *
     from hydro import visual
+    from hydro.parallel import DecomposedDomain
 
-    #solver = RMHDEquationsSolver(N=[256], L=[1.0], scheme='ctu_hancock')
-    #solver = EulersEquationsSolver(N=[256], L=[1.0], scheme='midpoint')
-    #solver = SRHDEquationsSolver(N=[256], L=[1.0], scheme='RK3')
-    solver = ScalarEquationsSolver(N=[256], L=[1.0], scheme='ctu_hancock')
+    solver = ScalarEquationsSolver(scheme='fwd_euler')
 
+    domain = DecomposedDomain()
     problem = SRShockTube1()
 
-    P = run_problem(solver, problem, quiet=True, CFL=0.1, tfinal=0.2)
+    P = run_problem(solver, problem, domain, quiet=True, CFL=0.4, tfinal=0.25)
 
     from pylab import plot, show, legend
-
     visual.shocktube(P)
     show()

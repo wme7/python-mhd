@@ -3,13 +3,7 @@
 
 class HydrodynamicsSolver:
 
-    def __init__(self):
-
-        raise NotImplementedError
-
-
-    def _loadlib_(self, **kwargs):
-
+    def __init__(self, scheme='midpoint'):
         from ctypes import CDLL, POINTER, Structure, c_double, c_int
         from numpy import float64, int32
         from numpy.ctypeslib import ndpointer
@@ -22,67 +16,60 @@ class HydrodynamicsSolver:
         int_vec = ndpointer(dtype=int32  , flags=('C_CONTIGUOUS'))
 
         lib_home = dirname(abspath(popen('find . -name *.so').readline()))
-        lib = CDLL(lib_home+'/'+self.libname+'.so')
+        clib = CDLL(lib_home+'/'+self.libname+'.so')
 
         self.schemes = ['fwd_euler', 'midpoint', 'RK3', 'ctu_hancock']
         self.ghost_cells = dict(zip(self.schemes,(2,4,6,4)))
         self.advance = { }
 
+        assert scheme in self.schemes
+
         for sname in self.schemes:
-            self.advance[sname] = lib.__getattr__('advance_state_'+sname)
+            self.advance[sname] = clib.__getattr__('advance_state_'+sname)
             self.advance[sname].argtypes = [dbl_arr, c_double]
 
-        lib.integrate_init.argtypes = [ int_vec, dbl_vec, c_int ]
+        clib.integrate_init.argtypes = [ int_vec, dbl_vec, c_int ]
 
-        self._clib = lib
-        self.kwargs = kwargs
+        self.clib = clib
+        self.scheme = scheme
+        self.NumGhostCells = self.ghost_cells[self.scheme]
 
 
-    def new_problem(self):
+    def new_problem(self, domain):
+        from numpy import array, float64, int32
 
-        from numpy import zeros, ones, int32
+        Ng = self.ghost_cells[self.scheme]
+        Nq = self.NumComponents
+        num_dims = len(domain.N)
 
-        self.scheme = self.kwargs['scheme']
-        assert self.scheme in self.schemes
+        N = [Ng ] + [n+2*Ng for n in domain.N]
+        L = [0.0] + [r-l for l,r in zip(domain.x0, domain.x1)]
 
-        N = self.kwargs['N']
-        L = self.kwargs['L']
+        while (len(N)<4):
+            N.append(1)
+            L.append(0.0)
 
-        N_grid, L_grid = ones(4, dtype=int32), zeros(4)
-        N_grid[0] = self.ghost_cells[self.scheme]
-        num_dims = len(N)
-
-        N_grid[1:1+num_dims] = N
-        L_grid[1:1+num_dims] = L
-
+        self.clib.integrate_init(array(N,int32), array(L,float64), Nq, num_dims)
         self.N = N
         self.L = L
 
-        self._clib.integrate_init(N_grid, L_grid, self.NumComponents, num_dims)
-
     def advance_state(self, P, dt):
         self.advance[self.scheme](P, dt)
-
-
-    def get_Ng(self):
-        return self.ghost_cells[self.scheme]
-
 
 
 
 class ScalarEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):
-
         self.libname = 'scalar'
         self.NumComponents = 1
-        self._loadlib_(**kwargs)
+        HydrodynamicsSolver.__init__(self, **kwargs)
+
 
 
 class EulersEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):
-
         self.libname = 'euler'
         self.NumComponents = 5
         self._loadlib_(**kwargs)
@@ -91,7 +78,6 @@ class EulersEquationsSolver(HydrodynamicsSolver):
 class SRHDEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):
-
         self.libname = 'srhd'
         self.NumComponents = 5
         self._loadlib_(**kwargs)
@@ -100,7 +86,7 @@ class SRHDEquationsSolver(HydrodynamicsSolver):
 class RMHDEquationsSolver(HydrodynamicsSolver):
 
     def __init__(self, **kwargs):
-
         self.libname = 'rmhd'
         self.NumComponents = 8
         self._loadlib_(**kwargs)
+
