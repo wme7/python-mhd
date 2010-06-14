@@ -33,7 +33,7 @@ class DecomposedDomain():
             X0.append(x0[i] + dx[i] *  global_start[i])
             X1.append(x0[i] + dx[i] * (global_start[i] + thisdm_size))
 
-        self.N = N
+        self.N = local_shape
         self.dx = dx
         self.x0 = X0
         self.x1 = X1
