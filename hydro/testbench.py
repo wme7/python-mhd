@@ -27,7 +27,7 @@ class TestProblemBase:
 
         if len(domain.N) is 3:
             X = linspace(x0[0]-Ng*dx[0], x1[0]+Ng*dx[0], N[0]+2*Ng)[:,n,n]
-            Y = linspace(x0[1]-Ng*dx[1], x1[1]+Ng*dx[1], N[1]+2*Ng)[:,n,:]
+            Y = linspace(x0[1]-Ng*dx[1], x1[1]+Ng*dx[1], N[1]+2*Ng)[n,:,n]
             Z = linspace(x0[2]-Ng*dx[2], x1[2]+Ng*dx[2], N[2]+2*Ng)[n,n,:]
 
         P = zeros(tuple([n+2*Ng for n in domain.N])+(Nq,))
@@ -73,28 +73,15 @@ class QuadrantProblem(TestProblemBase):
         self.SW_state.update(SW)
         self.adiabatic_gamma = gamma
 
-    def initial_model(self, N, Nq):
-        assert len(P.shape) is 3
-        from numpy import sqrt, array, zeros_like, linspace, where, newaxis
-
-        P = zeros(tuple(N)+(Nq,))
-        Nx, Ny, Nq = P.shape
-
-        X = linspace(-1,1,Nx)[:,newaxis]
-        Y = linspace(-1,1,Ny)[newaxis,:]
-
-        SW = where((X<=0.0) * (Y<=0.0))
-        NW = where((X<=0.0) * (Y >0.0))
-        SE = where((X >0.0) * (Y<=0.0))
-        NE = where((X >0.0) * (Y >0.0))
-
-        for i in range(Nq):
-            P[:,:,i][SW] = to_array(self.SW_state)[i]
-            P[:,:,i][NW] = to_array(self.NW_state)[i]
-            P[:,:,i][SE] = to_array(self.SE_state)[i]
-            P[:,:,i][NE] = to_array(self.NE_state)[i]
-
-        return P
+    def prim_at_point(self, x,y,z,i):
+        if x<=0.0 and y<=0.0:
+            return to_array(self.SW_state)[i]
+        if x<=0.0 and y >0.0:
+            return to_array(self.NW_state)[i]
+        if x >0.0 and y<=0.0:
+            return to_array(self.SE_state)[i]
+        if x >0.0 and y >0.0:
+            return to_array(self.NE_state)[i]
 
 
 class SRQuadrantA(QuadrantProblem):
@@ -103,10 +90,10 @@ class SRQuadrantA(QuadrantProblem):
         QuadrantProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.SW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
-        self.NW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.99, 0.00, 0.00], 'B': [0,0,0] }
-        self.SE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.99, 0.00], 'B': [0,0,0] }
-        self.NE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
+        self.SW_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0]}
+        self.NW_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.99, 0.00, 0.00], 'B': [0,0,0]}
+        self.SE_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.99, 0.00], 'B': [0,0,0]}
+        self.NE_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0]}
 
 
 class SRQuadrantB(QuadrantProblem):
@@ -115,10 +102,10 @@ class SRQuadrantB(QuadrantProblem):
         QuadrantProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.SW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
-        self.NW_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.80, 0.00, 0.00], 'B': [0,0,0] }
-        self.SE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.80, 0.00], 'B': [0,0,0] }
-        self.NE_state = { 'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0] }
+        self.SW_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0]}
+        self.NW_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.80, 0.00, 0.00], 'B': [0,0,0]}
+        self.SE_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.80, 0.00], 'B': [0,0,0]}
+        self.NE_state = {'Rho':1.0, 'Pre':1.0, 'v': [0.00, 0.00, 0.00], 'B': [0,0,0]}
 
 
 class ShockTubeProblem(TestProblemBase):
@@ -147,8 +134,8 @@ class SRShockTube1(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho':10.0, 'Pre':13.33, 'v': [0,0,0], 'B': [0,0,0] }
-        self.R_state = { 'Rho': 1.0, 'Pre': 0.01, 'v': [0,0,0], 'B': [0,0,0] }
+        self.L_state = {'Rho':10.0, 'Pre':13.33, 'v': [0,0,0], 'B': [0,0,0]}
+        self.R_state = {'Rho': 1.0, 'Pre': 0.01, 'v': [0,0,0], 'B': [0,0,0]}
 
 
 class SRShockTube2(ShockTubeProblem):
@@ -162,8 +149,8 @@ class SRShockTube2(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho': 1.0, 'Pre':1000.00, 'v': [0,0,0], 'B': [0,0,0] }
-        self.R_state = { 'Rho': 1.0, 'Pre':   0.01, 'v': [0,0,0], 'B': [0,0,0] }
+        self.L_state = {'Rho': 1.0, 'Pre':1000.00, 'v': [0,0,0], 'B': [0,0,0]}
+        self.R_state = {'Rho': 1.0, 'Pre':   0.01, 'v': [0,0,0], 'B': [0,0,0]}
 
 
 class SRShockTube3(ShockTubeProblem):
@@ -176,8 +163,8 @@ class SRShockTube3(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho': 1.0, 'Pre':1000.00, 'v': [0,0.9,0], 'B': [0,0,0] }
-        self.R_state = { 'Rho': 1.0, 'Pre':   0.01, 'v': [0,0.9,0], 'B': [0,0,0] }
+        self.L_state = {'Rho': 1.0, 'Pre':1000.00, 'v': [0,0.9,0], 'B': [0,0,0]}
+        self.R_state = {'Rho': 1.0, 'Pre':   0.01, 'v': [0,0.9,0], 'B': [0,0,0]}
 
 
 class RMHDShockTube1(ShockTubeProblem):
@@ -186,8 +173,8 @@ class RMHDShockTube1(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho': 1.000, 'Pre':1.0, 'v': [0,0,0], 'B': [0.5, 1.0, 0.0] }
-        self.R_state = { 'Rho': 0.125, 'Pre':0.1, 'v': [0,0,0], 'B': [0.5,-1.0, 0.0] }
+        self.L_state = {'Rho': 1.000, 'Pre':1.0, 'v': [0,0,0], 'B': [0.5, 1.0, 0.0]}
+        self.R_state = {'Rho': 0.125, 'Pre':0.1, 'v': [0,0,0], 'B': [0.5,-1.0, 0.0]}
 
 
 class RMHDShockTube2(ShockTubeProblem):
@@ -196,8 +183,8 @@ class RMHDShockTube2(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho': 1.08, 'Pre': 0.95, 'v': [ 0.40, 0.3, 0.2], 'B': [2.0, 0.3, 0.3] }
-        self.R_state = { 'Rho': 0.95, 'Pre': 1.00, 'v': [-0.45,-0.2, 0.2], 'B': [2.0,-0.7, 0.5] }
+        self.L_state = {'Rho': 1.08, 'Pre': 0.95, 'v': [ 0.40, 0.3, 0.2], 'B': [2.0, 0.3, 0.3]}
+        self.R_state = {'Rho': 0.95, 'Pre': 1.00, 'v': [-0.45,-0.2, 0.2], 'B': [2.0,-0.7, 0.5]}
 
 
 class RMHDShockTube3(ShockTubeProblem):
@@ -206,8 +193,8 @@ class RMHDShockTube3(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho': 1.00, 'Pre': 0.1, 'v': [ 0.999, 0.0, 0.0], 'B': [10.0, 7.0, 7.0] }
-        self.R_state = { 'Rho': 1.00, 'Pre': 0.1, 'v': [-0.999, 0.0, 0.0], 'B': [10.0,-7.0,-7.0] }
+        self.L_state = {'Rho': 1.00, 'Pre': 0.1, 'v': [ 0.999, 0.0, 0.0], 'B': [10.0, 7.0, 7.0]}
+        self.R_state = {'Rho': 1.00, 'Pre': 0.1, 'v': [-0.999, 0.0, 0.0], 'B': [10.0,-7.0,-7.0]}
 
 
 class RMHDShockTube4(ShockTubeProblem):
@@ -216,8 +203,8 @@ class RMHDShockTube4(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho': 1.0, 'Pre': 5.0, 'v': [0.0, 0.3, 0.4], 'B': [1.0, 6.0, 2.0] }
-        self.R_state = { 'Rho': 0.9, 'Pre': 5.3, 'v': [0.0, 0.0, 0.0], 'B': [1.0, 5.0, 2.0] }
+        self.L_state = {'Rho': 1.0, 'Pre': 5.0, 'v': [0.0, 0.3, 0.4], 'B': [1.0, 6.0, 2.0]}
+        self.R_state = {'Rho': 0.9, 'Pre': 5.3, 'v': [0.0, 0.0, 0.0], 'B': [1.0, 5.0, 2.0]}
 
 
 class RMHDContactWave(ShockTubeProblem):
@@ -226,8 +213,8 @@ class RMHDContactWave(ShockTubeProblem):
         ShockTubeProblem.__init__(self, **kwargs)
 
     def _setup_(self):
-        self.L_state = { 'Rho': 1.0, 'Pre': 1.0, 'v': [0.0, 0.7, 0.2], 'B': [5.0, 1.0, 0.5] }
-        self.R_state = { 'Rho': 0.1, 'Pre': 1.0, 'v': [0.0, 0.7, 0.2], 'B': [5.0, 1.0, 0.5] }
+        self.L_state = {'Rho': 1.0, 'Pre': 1.0, 'v': [0.0, 0.7, 0.2], 'B': [5.0, 1.0, 0.5]}
+        self.R_state = {'Rho': 0.1, 'Pre': 1.0, 'v': [0.0, 0.7, 0.2], 'B': [5.0, 1.0, 0.5]}
 
 
 class RMHDRotationalWave(ShockTubeProblem):
@@ -239,5 +226,40 @@ class RMHDRotationalWave(ShockTubeProblem):
         vR = [0.400000,-0.300000, 0.500000]
         vL = [0.377347,-0.482389, 0.424190]
 
-        self.L_state = { 'Rho': 1.0, 'Pre': 1.0, 'v': vL, 'B': [2.4, 1.0,-1.600000] }
-        self.R_state = { 'Rho': 1.0, 'Pre': 1.0, 'v': vR, 'B': [2.4,-0.1,-2.178213] }
+        self.L_state = {'Rho': 1.0, 'Pre': 1.0, 'v': vL, 'B': [2.4, 1.0,-1.600000]}
+        self.R_state = {'Rho': 1.0, 'Pre': 1.0, 'v': vR, 'B': [2.4,-0.1,-2.178213]}
+
+
+class KelvinHelmholtzProblem(TestProblemBase):
+
+    def __init__(self, I={ }, O={ }, gamma=1.4):
+        self._setup_()
+        self.I_state.update(I)
+        self.O_state.update(O)
+        self.adiabatic_gamma = gamma
+
+    def prim_at_point(self, x,y,z,i):
+        inside = -0.25 < y and y < 0.25
+        I = self.I_state
+        O = self.O_state
+        p = to_array(I)[i] if inside else to_array(O)[i]
+        return p + self.perturbation(x,y,z,i)
+
+
+class AthenaKelvinHelmholtz(KelvinHelmholtzProblem):
+
+    def __init__(self, **kwargs):
+        KelvinHelmholtzProblem.__init__(self, **kwargs)
+
+    def _setup_(self):        
+        self.I_state = {'Rho': 2.0, 'Pre': 2.5, 'v': [-0.5,0.0,0.0], 'B': [0.5,0.0,0.0]}
+        self.O_state = {'Rho': 1.0, 'Pre': 2.5, 'v': [ 0.5,0.0,0.0], 'B': [0.5,0.0,0.0]}
+
+    def perturbation(self, x,y,z,i):
+        from math import sin, pi
+        if i == 2:
+            return 0.01 * sin(2*pi*x)
+        elif i == 3:
+            return 0.01 * sin(2*pi*x)
+        else:
+            return 0.0

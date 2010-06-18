@@ -23,8 +23,6 @@ int flux_and_eval(const double *U, const double *P, double *F,
 		  double *ap, double *am, int dim);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
-int prim_to_cons_array(const double *P, double *U, int N);
-int cons_to_prim_array(const double *U, double *P, int N);
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
 int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
@@ -38,10 +36,6 @@ enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz }; // Conserved
 enum { rho, pre, vx, vy, vz };             // Primitive
 
 static double adiabatic_gamma=1.4;
-static int cons_to_prim_verbose=0;
-static int cons_to_prim_use_estimate=0;
-static int return_on_failure=0;
-static int FailedIndexLocation=0;
 static double FailedPrimState[8];
 static double FailedConsState[8];
 
@@ -82,7 +76,6 @@ static inline double eos_cs2(double Rho, double Pre)
   double e = eos_sie(Rho, Pre);
   return adiabatic_gamma * Pre / (Pre + Rho + Rho*e);
 }
-
 
 /*------------------------------------------------------------------------------
  *
@@ -216,8 +209,7 @@ int cons_to_prim_point(const double *U, double *P)
   const double BS    = U[Bx]*U[Sx] + U[By]*U[Sy] + U[Bz]*U[Sz];
   const double BS2   = BS*BS;
 
-  int est            = cons_to_prim_use_estimate;
-  int verbose        = cons_to_prim_verbose;
+  int est            = 0;
   int use_pres_floor = 0;
   int soln_found     = 0;
   int n_iter         = 0;
@@ -272,7 +264,6 @@ int cons_to_prim_point(const double *U, double *P)
       Z = Z_new;
       W = W_new;
 
-      if (verbose) {  }
       if (fabs(dZ/Z) + fabs(dW/W) < ERROR_TOLR)
         {
           if (Pre>=PRES_FLOOR)
@@ -343,35 +334,6 @@ int prim_to_cons_point(const double *P, double *U)
   U[Bz ] = P[Bz ];
   return 0;
 }
-
-int cons_to_prim_array(const double *U, double *P, int N)
-{
-  int failures = 0;
-  int i;
-  for (i=0; i<N*8; i+=8)
-    {
-      const double *Ui = &U[i];
-      double       *Pi = &P[i];
-
-      if (cons_to_prim_point(Ui,Pi))
-        {
-          FailedIndexLocation = i/8;
-          if (return_on_failure) return 1;
-          else failures++;
-        }
-    }
-  return failures;
-}
-int prim_to_cons_array(const double *P, double *U, int N)
-{
-  int i;
-  for (i=0; i<N*8; i+=8)
-    {
-      prim_to_cons_point(&P[i], &U[i]);
-    }
-  return 0;
-}
-
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4])
 {

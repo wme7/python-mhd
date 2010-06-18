@@ -18,12 +18,11 @@
  * Public Interface
  *
  */
+void set_flux_vector(double *A);
 int flux_and_eval(const double *U, const double *P, double *F,
 		  double *ap, double *am, int dim);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
-int prim_to_cons_array(const double *P, double *U, int N);
-int cons_to_prim_array(const double *U, double *P, int N);
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
 int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
@@ -33,15 +32,21 @@ int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
  * Private Data
  *
  */
-static const double Ax = 1.0; // Wavespeeds
-static const double Ay = 0.0;
-static const double Az = 0.0;
+static double Ax = 1.0; // Wavespeeds
+static double Ay = 0.0;
+static double Az = 0.0;
 
 /*------------------------------------------------------------------------------
  *
  * Public Functions Definitions
  *
  */
+void set_flux_vector(double *A)
+{
+  Ax = A[0];
+  Ay = A[1];
+  Az = A[2];
+}
 int flux_and_eval(const double *U, const double *P, double *F,
 		  double *ap, double *am, int dim)
 {
@@ -75,7 +80,6 @@ int flux_and_eval(const double *U, const double *P, double *F,
   return 0;
 }
 
-
 int cons_to_prim_point(const double *U, double *P)
 {
   P[0] = U[0];
@@ -86,20 +90,6 @@ int prim_to_cons_point(const double *P, double *U)
   U[0] = P[0];
   return 0;
 }
-
-int cons_to_prim_array(const double *U, double *P, int N)
-{
-  int i;
-  for (i=0; i<N*1; i+=1) cons_to_prim_point(&U[i],&P[i]);
-  return 0;
-}
-int prim_to_cons_array(const double *P, double *U, int N)
-{
-  int i;
-  for (i=0; i<N*1; i+=1) prim_to_cons_point(&P[i],&U[i]);
-  return 0;
-}
-
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4])
 {

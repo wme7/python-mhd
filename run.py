@@ -15,16 +15,26 @@ def run_problem(solver, problem, domain, boundary, name=None, quiet=True, CFL=0.
     start_time = time()
 
     solver.new_problem(domain)
+
     while t < tfinal:
 
         start = time()
+
         domain.set_BC(P, Ng, boundary)
-        solver.advance_state(P,dt)
+        failures = solver.advance_state(P,dt)
+
+        if failures and True:
+            from pylab import imshow, show
+            print failures
+            imshow(solver.get_failure_mask(), interpolation='nearest')
+            show()
+            exit(1)
+
         t += dt
         nc += 1
         step_time = time()-start
 
-        msg_data = (nc, t, dt, 1e6*step_time/P.size, 0)
+        msg_data = (nc, t, dt, 1e6*step_time/P.size, failures)
         msg_text = "N: %05d t: %6.4f dt: %6.4e us/zone: %5.4f failures: %d"
         if not quiet: print msg_text % msg_data
 
@@ -71,28 +81,23 @@ def run_problem(solver, problem, domain, boundary, name=None, quiet=True, CFL=0.
         return P
 
 
-def eulers():
-    from hydro import visual, EulersEquationsSolver
-    from hydro.testbench import SRShockTube1, RMHDCylindricalA
+if __name__ == "__main__":
+    from hydro import visual, EulersEquationsSolver, RMHDEquationsSolver, SRHDEquationsSolver
+    from hydro.testbench import *
     from hydro.boundary import OutflowBoundary
     from hydro.domain import SimpleCartesianDomain
     from hydro.parallel import DistributedDomain
 
-    DomainClass = DistributedDomain
+    DomainClass = SimpleCartesianDomain
 
-    solver = EulersEquationsSolver(scheme='midpoint')
-    problem = RMHDCylindricalA()
-    domain = DomainClass((1024,1024), (-1.0,-1.0), (1.0,1.0))
+    solver = SRHDEquationsSolver(scheme='ctu_hancock')
+    problem = AthenaKelvinHelmholtz()
+    domain = DomainClass((128,128), (-0.5,-0.5), (0.5,0.5))
     boundary = OutflowBoundary()
 
     P = run_problem(solver, problem, domain, boundary,
-                    quiet=(domain.rank is not 0), CFL=0.4, tfinal=0.1)
+                    quiet=(domain.rank is not 0), CFL=0.6, tfinal=4)
 
     if domain.rank is 0:
-        visual.hyd_four_pane_2d(P)
+        visual.four_pane_2d(P)
         visual.show()
-
-
-if __name__ == "__main__":
-    
-    eulers()

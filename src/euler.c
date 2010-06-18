@@ -23,8 +23,6 @@ int flux_and_eval(const double *U, const double *P, double *F,
 		  double *ap, double *am, int dim);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
-int prim_to_cons_array(const double *P, double *U, int N);
-int cons_to_prim_array(const double *U, double *P, int N);
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
 int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
@@ -99,7 +97,6 @@ int flux_and_eval(const double *U, const double *P, double *F,
   return 0;
 }
 
-
 int cons_to_prim_point(const double *U, double *P)
 {
   const double gm1 = adiabatic_gamma-1.0;
@@ -120,20 +117,6 @@ int prim_to_cons_point(const double *P, double *U)
   U[nrg] = P[rho] * 0.5*(P[vx]*P[vx] + P[vy]*P[vy] + P[vz]*P[vz]) + P[pre]/gm1;
   return 0;
 }
-
-int cons_to_prim_array(const double *U, double *P, int N)
-{
-  int i;
-  for (i=0; i<N*5; i+=5) cons_to_prim_point(&U[i],&P[i]);
-  return 0;
-}
-int prim_to_cons_array(const double *P, double *U, int N)
-{
-  int i;
-  for (i=0; i<N*5; i+=5) prim_to_cons_point(&P[i],&U[i]);
-  return 0;
-}
-
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4])
 {

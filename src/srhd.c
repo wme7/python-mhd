@@ -23,8 +23,6 @@ int flux_and_eval(const double *U, const double *P, double *F,
 		  double *ap, double *am, int dim);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
-int prim_to_cons_array(const double *P, double *U, int N);
-int cons_to_prim_array(const double *U, double *P, int N);
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
 int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
@@ -34,15 +32,12 @@ int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
  * Private Data
  *
  */
-
 enum { ddd, tau, Sx, Sy, Sz }; // Conserved
 enum { rho, pre, vx, vy, vz }; // Primitive
 
 static double adiabatic_gamma=1.4;
-static int return_on_failure=0;
-static int FailedIndexLocation=0;
-static double FailedPrimState[5];
-static double FailedConsState[5];
+static double FailedPrimState[8];
+static double FailedConsState[8];
 
 /*------------------------------------------------------------------------------
  *
@@ -72,7 +67,6 @@ void set_adiabatic_gamma(double g)
 {
   adiabatic_gamma = g;
 }
-
 
 int flux_and_eval(const double *U, const double *P, double *F,
 		  double *ap, double *am, int dim)
@@ -128,7 +122,6 @@ int flux_and_eval(const double *U, const double *P, double *F,
 
   return 0;
 }
-
 
 int cons_to_prim_point(const double *U, double *P)
 {
@@ -195,35 +188,6 @@ int prim_to_cons_point(const double *P, double *U)
 
   return 0;
 }
-
-int cons_to_prim_array(const double *U, double *P, int N)
-{
-  int failures = 0;
-  int i;
-  for (i=0; i<N*5; i+=5)
-    {
-      const double *Ui = &U[i];
-      double       *Pi = &P[i];
-
-      if (cons_to_prim_point(Ui,Pi))
-        {
-          FailedIndexLocation = i/5;
-          if (return_on_failure) return 1;
-          else failures++;
-        }
-    }
-  return failures;
-}
-int prim_to_cons_array(const double *P, double *U, int N)
-{
-  int i;
-  for (i=0; i<N*5; i+=5)
-    {
-      prim_to_cons_point(&P[i], &U[i]);
-    }
-  return 0;
-}
-
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4])
 {

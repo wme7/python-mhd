@@ -17,10 +17,16 @@
  *
  */
 int integrate_init(int N[4], double L[4], int num_comp, int num_dims);
+int integrate_free();
+int get_failure_mask(int *M);
+
 int advance_state_fwd_euler   (double *P, double dt);
 int advance_state_midpoint    (double *P, double dt);
 int advance_state_RK3         (double *P, double dt);
 int advance_state_ctu_hancock (double *P, double dt);
+
+int prim_to_cons_array(double *P, double *U, int N);
+int cons_to_prim_array(double *U, double *P, int N);
 
 /*------------------------------------------------------------------------------
  *
@@ -32,8 +38,6 @@ int hll_flux(const double *pl, const double *pr, double *U, double *F,
 
 int flux_and_eval(const double *U, const double *P, double *F,
                   double *ap, double *am, int dim);
-int prim_to_cons_array(const double *P, double *U, int N);
-int cons_to_prim_array(const double *U, double *P, int N);
 
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
@@ -53,8 +57,6 @@ static int intercell_flux_sweep(const double *P, double *F, int dim);
 static int drive_sweeps_1d(const double *P, double *L);
 static int drive_sweeps_2d(const double *P, double *L);
 static int drive_sweeps_3d(const double *P, double *L);
-
-
 /*------------------------------------------------------------------------------
  *
  * Private Data
@@ -63,6 +65,8 @@ static int drive_sweeps_3d(const double *P, double *L);
 #define MAXNQ 8 // Used for static array initialization
 
 int NQ,ND;
+static int *failure_mask;
+static int cons_to_prim_fail_fatal=0;
 static int stride[4];
 static double plm_theta=2.0;
 static double dx,dy,dz;
@@ -71,7 +75,6 @@ static double (*slope_limiter)(double, double, double);
 static int (*godunov_intercell_flux)(const double*, const double*, double*, double*,
                                      double, int);
 static int (*drive_sweeps)(const double*, double*);
-
 
 /*------------------------------------------------------------------------------
  *
@@ -147,9 +150,44 @@ int integrate_init(int N[4], double L[4], int num_comp, int num_dims)
     case 3: drive_sweeps = drive_sweeps_3d; break;
     }
 
+  failure_mask = (int*) malloc(stride[0]/NQ*sizeof(int));
+
+  return 0;
+}
+int integrate_free()
+{
+  free(failure_mask);
+  return 0;
+}
+int get_failure_mask(int *M)
+{
+  memcpy(M, failure_mask, stride[0]/NQ*sizeof(int));
   return 0;
 }
 
+int cons_to_prim_array(double *U, double *P, int N)
+{
+  int i,failures=0;
+  for (i=0; i<N*NQ; i+=NQ)
+    {
+      failure_mask[i/NQ] = 0;
+      if (cons_to_prim_point(&U[i],&P[i]))
+        {
+	  failure_mask[i/NQ] = 1;
+	  failures++;
+        }
+    }
+  return failures;
+}
+int prim_to_cons_array(double *P, double *U, int N)
+{
+  int i;
+  for (i=0; i<N*NQ; i+=NQ)
+    {
+      prim_to_cons_point(&P[i], &U[i]);
+    }
+  return 0;
+}
 
 
 int advance_state_fwd_euler(double *P, double dt)
@@ -167,7 +205,7 @@ int advance_state_fwd_euler(double *P, double dt)
   free(L);
   free(U0);
 
-  return 0;
+  return failures;
 }
 int advance_state_midpoint(double *P, double dt)
 {
@@ -190,7 +228,7 @@ int advance_state_midpoint(double *P, double dt)
   free(U0);
   free(U1);
 
-  return 0;
+  return failures;
 }
 int advance_state_RK3(double *P, double dt)
 {
@@ -217,7 +255,7 @@ int advance_state_RK3(double *P, double dt)
   free(U0);
   free(U1);
 
-  return 0;
+  return failures;
 }
 
 
@@ -243,19 +281,17 @@ static int intercell_flux_sweep(const double *P, double *F, int dim)
   int i,S=stride[dim];
   double Pl[MAXNQ], Pr[MAXNQ];
 
-  for (i=0; i<S; ++i)
-    {
-      F[i] = 0.0;
-    }
-  for (i=S; i<stride[0]-S*2; i+=NQ)
+  for (i=S; i<stride[0]-2*S; i+=NQ)
     {
       reconstruct_plm(&P[i], Pl, Pr, S);
       godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0, dim);
     }
-  for (i=stride[0]-S*2; i<stride[0]; ++i)
-    {
-      F[i] = 0.0;
-    }
+
+  for (i=0; i<S; ++i)
+    F[i] = F[i+S];
+
+  for (i=stride[0]-2*S; i<stride[0]; ++i)
+    F[i] = F[i-S];
 
   return 0;
 }

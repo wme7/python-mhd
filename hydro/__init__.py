@@ -12,6 +12,7 @@ class HydrodynamicsSolver:
 
         dbl_arr = ndpointer(dtype=float64, flags=('C_CONTIGUOUS', 'WRITEABLE'))
         dbl_vec = ndpointer(dtype=float64, flags=('C_CONTIGUOUS'))
+        int_arr = ndpointer(dtype=int32  , flags=('C_CONTIGUOUS', 'WRITEABLE'))
         int_vec = ndpointer(dtype=int32  , flags=('C_CONTIGUOUS'))
 
         lib_home = dirname(abspath(popen('find . -name *.so').readline()))
@@ -28,11 +29,15 @@ class HydrodynamicsSolver:
             self.advance[sname].argtypes = [dbl_arr, c_double]
 
         clib.integrate_init.argtypes = [ int_vec, dbl_vec, c_int ]
+        clib.integrate_free.argtypes = [ ]
+        clib.get_failure_mask.argtypes = [ int_arr ]
 
         self.clib = clib
         self.scheme = scheme
         self.NumGhostCells = self.ghost_cells[self.scheme]
 
+    def __del__(self):
+        self.clib.integrate_free()
 
     def new_problem(self, domain):
         from numpy import array, float64, int32
@@ -51,9 +56,16 @@ class HydrodynamicsSolver:
         self.clib.integrate_init(array(N,int32), array(L,float64), Nq, num_dims)
         self.N = N
         self.L = L
+        self.num_dims = num_dims
 
     def advance_state(self, P, dt):
-        self.advance[self.scheme](P, dt)
+        return self.advance[self.scheme](P, dt)
+
+    def get_failure_mask(self):
+        from numpy import zeros, int32
+        M = zeros(self.N[1:self.num_dims+1], dtype=int32)
+        self.clib.get_failure_mask(M)
+        return M
 
 
 class ScalarEquationsSolver(HydrodynamicsSolver):
