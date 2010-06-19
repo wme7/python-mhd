@@ -24,7 +24,7 @@ def run_problem(solver, problem, domain, boundary, name=None, quiet=True, CFL=0.
         domain.set_BC(P, Ng, boundary)
         failures = solver.advance_state(P,dt)
 
-        if failures and True:
+        if failures and False:
             from pylab import imshow, show
             print failures
             imshow(solver.get_failure_mask(), interpolation='nearest')
@@ -89,15 +89,15 @@ if __name__ == "__main__":
     from hydro.domain import SimpleCartesianDomain
     from hydro.parallel import DistributedDomain
 
-    DomainClass = DistributedDomain#SimpleCartesianDomain
+    DomainClass = SimpleCartesianDomain
 
-    solver = EulersEquationsSolver(scheme='midpoint')
-    problem = RMHDCylindricalA(pre=1.0, I={'Rho':10.0})#SRShockTube1()#AthenaKelvinHelmholtz()
-    domain = DomainClass((256,256), (-0.5,-0.5), (0.5,0.5))
+    solver = RMHDEquationsSolver(scheme='ctu_hancock')
+    problem = RMHDCylindricalA(pre=100.0)
+    domain = DomainClass((128,128), (-0.5,-0.5), (0.5,0.5))
     boundary = OutflowBoundary()
 
     P = run_problem(solver, problem, domain, boundary,
-                    quiet=(domain.rank is not 0), CFL=0.5, tfinal=0.1)
+                    quiet=(domain.rank is not 0), CFL=0.5, tfinal=0.4)
 
     if domain.rank is 0:
         visual.four_pane_2d(P)

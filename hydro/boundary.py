@@ -30,10 +30,10 @@ class OutflowBoundary:
 
     def y0_wall_2d(self, A, Ng):
         for i in range(Ng):
-            A[ i  ,:] = A[ Ng  ,:]
+            A[:, i  ] = A[:, Ng  ]
     def y1_wall_2d(self, A, Ng):
         for i in range(Ng):
-            A[-i-1,:] = A[-Ng-1,:]
+            A[:,-i-1] = A[:,-Ng-1]
 
     # --------------------------------------------------------------- 3D
     def x0_wall_3d(self, A, Ng):
