@@ -4,6 +4,7 @@
 def run_problem(solver, problem, domain, boundary, name=None, quiet=True, CFL=0.3, tfinal=0.2):
     from time import time
     if name is None: name = problem.__class__
+    from numpy import array, float64
 
     Nq = solver.NumComponents
     Ng = solver.NumGhostCells
@@ -88,15 +89,15 @@ if __name__ == "__main__":
     from hydro.domain import SimpleCartesianDomain
     from hydro.parallel import DistributedDomain
 
-    DomainClass = SimpleCartesianDomain
+    DomainClass = DistributedDomain#SimpleCartesianDomain
 
-    solver = SRHDEquationsSolver(scheme='ctu_hancock')
-    problem = AthenaKelvinHelmholtz()
-    domain = DomainClass((128,128), (-0.5,-0.5), (0.5,0.5))
+    solver = EulersEquationsSolver(scheme='midpoint')
+    problem = RMHDCylindricalA(pre=1.0, I={'Rho':10.0})#SRShockTube1()#AthenaKelvinHelmholtz()
+    domain = DomainClass((256,256), (-0.5,-0.5), (0.5,0.5))
     boundary = OutflowBoundary()
 
     P = run_problem(solver, problem, domain, boundary,
-                    quiet=(domain.rank is not 0), CFL=0.6, tfinal=4)
+                    quiet=(domain.rank is not 0), CFL=0.5, tfinal=0.1)
 
     if domain.rank is 0:
         visual.four_pane_2d(P)

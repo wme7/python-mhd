@@ -6,9 +6,8 @@ class DistributedDomain():
         assert len(N) is len(x0) is len(x1)
         from mpi4py.MPI import COMM_WORLD, Compute_dims
 
-        periods = [True for n in N]
         mpi_sizes = Compute_dims(COMM_WORLD.size, len(N))
-        cart = COMM_WORLD.Create_cart(mpi_sizes, periods=periods)
+        cart = COMM_WORLD.Create_cart(mpi_sizes, periods=[True for n in N])
         mpi_coord = cart.Get_coords(COMM_WORLD.rank)
 
         global_shape = [n for n in N]
@@ -46,7 +45,7 @@ class DistributedDomain():
         self.is_distributed = True
 
     def synchronize(self, A, Ng):
-        from mpi4py.MPI import COMM_WORLD, Compute_dims
+        from mpi4py.MPI import COMM_WORLD
 
         if len(A.shape) == 2:
             L,R = self.cart.Shift(0,1)
