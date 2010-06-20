@@ -11,28 +11,28 @@ class TestProblemBase:
         raise NotImplementedError
 
     def initial_model(self, domain, Ng, Nq):
-        from numpy import zeros, linspace, vectorize, zeros_like, newaxis as n
+        from numpy import zeros, linspace, vectorize, zeros_like, newaxis as na
         x0, x1, dx, N = domain.x0, domain.x1, domain.dx, domain.N
         vfunc = vectorize(self.prim_at_point)
+        P = zeros(tuple([n+2*Ng for n in domain.N])+(Nq,))
 
         if len(domain.N) is 1:
-            X = linspace(x0[0]-Ng*dx[0], x1[0]+Ng*dx[0], N[0]+2*Ng)
-            Y = zeros_like(X)
-            Z = zeros_like(Y)
+            X = linspace(x0[0]-(Ng-0.5)*dx[0], x1[0]+(Ng-0.5)*dx[0], N[0]+2*Ng)
+            for i in range(Nq):
+                P[...,i] = vfunc(X,0,0,i)
 
         if len(domain.N) is 2:
-            X = linspace(x0[0]-Ng*dx[0], x1[0]+Ng*dx[0], N[0]+2*Ng)[:,n]
-            Y = linspace(x0[1]-Ng*dx[1], x1[1]+Ng*dx[1], N[1]+2*Ng)[n,:]
-            Z = zeros_like(Y)
+            X = linspace(x0[0]-(Ng-0.5)*dx[0], x1[0]+(Ng-0.5)*dx[0], N[0]+2*Ng)[:,na]
+            Y = linspace(x0[1]-(Ng-0.5)*dx[1], x1[1]+(Ng-0.5)*dx[1], N[1]+2*Ng)[na,:]
+            for i in range(Nq):
+                P[...,i] = vfunc(X,Y,0,i)
 
         if len(domain.N) is 3:
-            X = linspace(x0[0]-Ng*dx[0], x1[0]+Ng*dx[0], N[0]+2*Ng)[:,n,n]
-            Y = linspace(x0[1]-Ng*dx[1], x1[1]+Ng*dx[1], N[1]+2*Ng)[n,:,n]
-            Z = linspace(x0[2]-Ng*dx[2], x1[2]+Ng*dx[2], N[2]+2*Ng)[n,n,:]
-
-        P = zeros(tuple([n+2*Ng for n in domain.N])+(Nq,))
-        for i in range(Nq):
-            P[...,i] = vfunc(X,Y,Z,i)
+            X = linspace(x0[0]-(Ng-0.5)*dx[0], x1[0]+(Ng-0.5)*dx[0], N[0]+2*Ng)[:,na,na]
+            Y = linspace(x0[1]-(Ng-0.5)*dx[1], x1[1]+(Ng-0.5)*dx[1], N[1]+2*Ng)[na,:,na]
+            Z = linspace(x0[2]-(Ng-0.5)*dx[2], x1[2]+(Ng-0.5)*dx[2], N[2]+2*Ng)[na,na,:]
+            for i in range(Nq):
+                P[...,i] = vfunc(X,Y,Z,i)
 
         return P
 

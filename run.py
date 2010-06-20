@@ -50,34 +50,8 @@ def run_problem(solver, problem, domain, boundary, name=None, quiet=True, CFL=0.
         P = P[Ng:-Ng,Ng:-Ng,Ng:-Ng]
 
     if domain.is_distributed:
-        from os import listdir, system
-        from pickle import load
-        from numpy import zeros
-
         domain.dump(P)
-
-        fnames = [x for x in listdir('.') if x.endswith('.pk')]
-        tiles = [load(open(fn)) for fn in fnames]
-        ndims = len(tiles[0]['data'].shape)-1
-        Nq = tiles[0]['data'].shape[-1]
-        N = tuple(domain.global_shape)
-        P = zeros(N+(Nq,))
-
-        for i,t in enumerate(tiles):
-            if len(N) == 1:
-                pi = t['data']
-                i0 = t['global_start'][0]
-                i1 = t['global_start'][0] + pi.shape[0]
-                P[i0:i1,:] = pi
-
-            if len(N) == 2:
-                pi = t['data']
-                i0,j0 = t['global_start']
-                i1,j1 = [g+s for g,s in zip(t['global_start'], pi.shape)]
-                P[i0:i1,j0:j1,:] = pi
-
-        return P
-
+        return domain.read()
     else:
         return P
 
@@ -89,15 +63,15 @@ if __name__ == "__main__":
     from hydro.domain import SimpleCartesianDomain
     from hydro.parallel import DistributedDomain
 
-    DomainClass = SimpleCartesianDomain
+    DomainClass = DistributedDomain
 
-    solver = RMHDEquationsSolver(scheme='ctu_hancock')
-    problem = RMHDCylindricalA(pre=100.0)
-    domain = DomainClass((128,128), (-0.5,-0.5), (0.5,0.5))
+    solver = EulersEquationsSolver(scheme='midpoint')
+    problem = RMHDCylindricalA()
+    domain = DomainClass((32,32), (-0.5,-0.5), (0.5,0.5))
     boundary = OutflowBoundary()
 
     P = run_problem(solver, problem, domain, boundary,
-                    quiet=(domain.rank is not 0), CFL=0.5, tfinal=0.4)
+                    quiet=(domain.rank is not 0), CFL=0.4, tfinal=0.1)
 
     if domain.rank is 0:
         visual.four_pane_2d(P)
