@@ -12,8 +12,8 @@ class SimpleCartesianDomain():
         self.rank = 0
 
     def set_BC(self, A, Ng, BC):
-        L_BCs = BC.L_wall[len(A.shape)-2]
-        R_BCs = BC.R_wall[len(A.shape)-2]
+        L_BCs = BC.L_wall[len(A.shape)-1]
+        R_BCs = BC.R_wall[len(A.shape)-1]
 
         for i,BC in enumerate(L_BCs): BC(A, Ng)
         for i,BC in enumerate(R_BCs): BC(A, Ng)

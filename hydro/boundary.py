@@ -4,13 +4,11 @@
 class OutflowBoundary:
 
     def __init__(self):
+        self.L_wall = { 1: [self.x0_wall_1d], 2: [self.x0_wall_2d, self.y0_wall_2d],
+                        3: [self.x0_wall_3d, self.y0_wall_3d, self.z0_wall_3d] }
 
-        self.L_wall = [ [self.x0_wall_1d], [self.x0_wall_2d, self.y0_wall_2d],
-                        [self.x0_wall_3d, self.y0_wall_3d, self.z0_wall_3d] ]
-
-        self.R_wall = [ [self.x1_wall_1d], [self.x1_wall_2d, self.y1_wall_2d],
-                        [self.x1_wall_3d, self.y1_wall_3d, self.z1_wall_3d] ]
-
+        self.R_wall = { 1: [self.x1_wall_1d], 2: [self.x1_wall_2d, self.y1_wall_2d],
+                        3: [self.x1_wall_3d, self.y1_wall_3d, self.z1_wall_3d] }
 
     # --------------------------------------------------------------- 1D
     def x0_wall_1d(self, A, Ng):

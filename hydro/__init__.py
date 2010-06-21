@@ -1,4 +1,7 @@
 
+from config import host_config
+from sys import path
+path.append(host_config['mpi4py_path'])
 
 class HydrodynamicsSolver:
 
@@ -6,7 +9,6 @@ class HydrodynamicsSolver:
         from ctypes import CDLL, POINTER, CFUNCTYPE, Structure, c_double, c_int
         from numpy import float64, int32
         from numpy.ctypeslib import ndpointer
-        from sys import path
         from os.path import abspath, dirname
         from os import popen
 

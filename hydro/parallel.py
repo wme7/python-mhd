@@ -4,7 +4,11 @@ class DistributedDomain():
 
     def __init__(self, N=(256,), x0=(0.0,), x1=(1.0,)):
         assert len(N) is len(x0) is len(x1)
-        from mpi4py.MPI import COMM_WORLD, Compute_dims
+        try:
+            from mpi4py.MPI import COMM_WORLD, Compute_dims
+        except ImportError:
+            print "Error! DistributedDomain requires the mpi4py package."
+            exit()
 
         mpi_sizes = Compute_dims(COMM_WORLD.size, len(N))
         cart = COMM_WORLD.Create_cart(mpi_sizes, periods=[True for n in N])
@@ -78,8 +82,8 @@ class DistributedDomain():
         self.synchronize(A, Ng)
         if BC is None: return
 
-        L_BCs = BC.L_wall[len(A.shape)-2]
-        R_BCs = BC.R_wall[len(A.shape)-2]
+        L_BCs = BC.L_wall[len(A.shape)-1]
+        R_BCs = BC.R_wall[len(A.shape)-1]
 
         for i,BC in enumerate(L_BCs):
             if self.mpi_coord[i] == 0:

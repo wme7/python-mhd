@@ -79,7 +79,6 @@ static SweepsDriver drive_sweeps;
 
 #define MAXNQ 8 // Used for static array initialization
 static int *failure_mask;
-static int cons_to_prim_fail_fatal=0;
 static int stride[4];
 static double plm_theta=2.0;
 static double dx,dy,dz;
