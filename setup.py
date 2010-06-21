@@ -8,8 +8,8 @@ if __name__ == "__main__":
 
     srcscalar = ['integrate.c', 'hll.c', 'scalar.c']
     srceuler  = ['integrate.c', 'hll.c', 'euler.c']
-    srcsrhd   = ['integrate.c', 'hll.c',  'srhd.c']
-    srcrmhd   = ['integrate.c', 'hll.c',  'rmhd.c', 'quartic.c']
+    srcsrhd   = ['integrate.c', 'hll.c', 'srhd.c']
+    srcrmhd   = ['integrate.c', 'hll.c', 'hllc_rmhd.c', 'rmhd.c', 'quartic.c']
 
     ext_scalar = Extension(name               = 'scalar',
                            sources            = ['src/'+s for s in srcscalar],

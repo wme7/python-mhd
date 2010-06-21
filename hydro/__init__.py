@@ -2,8 +2,8 @@
 
 class HydrodynamicsSolver:
 
-    def __init__(self, scheme='midpoint'):
-        from ctypes import CDLL, POINTER, Structure, c_double, c_int
+    def __init__(self, scheme='midpoint', solver='hll'):
+        from ctypes import CDLL, POINTER, CFUNCTYPE, Structure, c_double, c_int
         from numpy import float64, int32
         from numpy.ctypeslib import ndpointer
         from sys import path
@@ -23,18 +23,21 @@ class HydrodynamicsSolver:
         self.advance = { }
 
         assert scheme in self.schemes
+        assert solver in self.solvers
 
         for sname in self.schemes:
-            self.advance[sname] = clib.__getattr__('advance_state_'+sname)
+            self.advance[sname] = getattr(clib, 'advance_state_'+sname)
             self.advance[sname].argtypes = [dbl_arr, c_double]
 
-        clib.integrate_init.argtypes = [ int_vec, dbl_vec, c_int ]
+        clib.integrate_init.argtypes = [int_vec, dbl_vec, c_int]
         clib.integrate_free.argtypes = [ ]
-        clib.get_failure_mask.argtypes = [ int_arr ]
+        clib.get_failure_mask.argtypes = [int_arr]
+        clib.set_riemann_solver.argtypes = [c_int]
 
         self.clib = clib
         self.scheme = scheme
         self.NumGhostCells = self.ghost_cells[self.scheme]
+        self.solver = solver
 
     def __del__(self):
         self.clib.integrate_free()
@@ -54,6 +57,7 @@ class HydrodynamicsSolver:
             L.append(0.0)
 
         self.clib.integrate_init(array(N,int32), array(L,float64), Nq, num_dims)
+        self.clib.set_riemann_solver(self.solvers[self.solver])
         self.N = N
         self.L = L
         self.num_dims = num_dims
@@ -73,6 +77,7 @@ class ScalarEquationsSolver(HydrodynamicsSolver):
     def __init__(self, **kwargs):
         self.libname = 'scalar'
         self.NumComponents = 1
+        self.solvers = {'hll': 0}
         HydrodynamicsSolver.__init__(self, **kwargs)
 
 
@@ -81,6 +86,7 @@ class EulersEquationsSolver(HydrodynamicsSolver):
     def __init__(self, **kwargs):
         self.libname = 'euler'
         self.NumComponents = 5
+        self.solvers = {'hll': 0}
         HydrodynamicsSolver.__init__(self, **kwargs)
 
 
@@ -89,6 +95,7 @@ class SRHDEquationsSolver(HydrodynamicsSolver):
     def __init__(self, **kwargs):
         self.libname = 'srhd'
         self.NumComponents = 5
+        self.solvers = {'hll': 0}
         HydrodynamicsSolver.__init__(self, **kwargs)
 
 
@@ -97,4 +104,5 @@ class RMHDEquationsSolver(HydrodynamicsSolver):
     def __init__(self, **kwargs):
         self.libname = 'rmhd'
         self.NumComponents = 8
+        self.solvers = {'hll': 0, 'hllc': 1}
         HydrodynamicsSolver.__init__(self, **kwargs)

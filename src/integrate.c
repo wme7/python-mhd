@@ -28,12 +28,16 @@ int advance_state_ctu_hancock (double *P, double dt);
 int prim_to_cons_array(double *P, double *U, int N);
 int cons_to_prim_array(double *U, double *P, int N);
 
+int NQ,ND;
+
 /*------------------------------------------------------------------------------
  *
  * External Dependecies
  *
  */
 int hll_flux(const double *pl, const double *pr, double *U, double *F,
+             double s, int dim);
+int hllc_flux(const double *pl, const double *pr, double *U, double *F,
              double s, int dim);
 
 int flux_and_eval(const double *U, const double *P, double *F,
@@ -44,7 +48,6 @@ int cons_to_prim_point(const double *U, double *P);
 
 int constrained_transport_2d(double *Fx, double *Fy, int stride[4]);
 int constrained_transport_3d(double *Fx, double *Fy, double *Fz, int stride[4]);
-
 
 /*------------------------------------------------------------------------------
  *
@@ -57,24 +60,29 @@ static int intercell_flux_sweep(const double *P, double *F, int dim);
 static int drive_sweeps_1d(const double *P, double *L);
 static int drive_sweeps_2d(const double *P, double *L);
 static int drive_sweeps_3d(const double *P, double *L);
+
+static inline double plm_minmod(double ul, double u0, double ur);
+static inline double MC_limiter(double ul, double u0, double ur);
+static inline double harmonic_mean(double ul, double u0, double ur);
 /*------------------------------------------------------------------------------
  *
  * Private Data
  *
  */
-#define MAXNQ 8 // Used for static array initialization
+typedef double (*SlopeLimiter)(double, double, double);
+typedef int (*RiemannSolver)(const double*, const double*, double*, double*, double, int);
+typedef int (*SweepsDriver)(const double*, double*);
 
-int NQ,ND;
+static SlopeLimiter slope_limiter = plm_minmod;
+static RiemannSolver intercell_flux = hll_flux;
+static SweepsDriver drive_sweeps;
+
+#define MAXNQ 8 // Used for static array initialization
 static int *failure_mask;
 static int cons_to_prim_fail_fatal=0;
 static int stride[4];
 static double plm_theta=2.0;
 static double dx,dy,dz;
-
-static double (*slope_limiter)(double, double, double);
-static int (*godunov_intercell_flux)(const double*, const double*, double*, double*,
-                                     double, int);
-static int (*drive_sweeps)(const double*, double*);
 
 /*------------------------------------------------------------------------------
  *
@@ -120,6 +128,94 @@ static inline double harmonic_mean(double ul, double u0, double ur)
   return (sign(qp)==sign(qm)) ? 2*qp*qm/(ur-ul) : 0;
 }
 
+/*------------------------------------------------------------------------------
+ *
+ * Private Functions Definitions
+ *
+ */
+static int reconstruct_plm(const double *P0, double *Pl, double *Pr, int S)
+{
+  int i,T=2*S;
+  for (i=0; i<NQ; ++i)
+    {
+      Pr[i] = P0[S+i] - 0.5 * slope_limiter(P0[ 0+i], P0[S+i], P0[T+i]);
+      Pl[i] = P0[0+i] + 0.5 * slope_limiter(P0[-S+i], P0[0+i], P0[S+i]);
+    }
+  return 0;
+}
+static int intercell_flux_sweep(const double *P, double *F, int dim)
+{
+  int i,S=stride[dim];
+  double Pl[MAXNQ], Pr[MAXNQ];
+  for (i=S; i<stride[0]-2*S; i+=NQ)
+    {
+      reconstruct_plm(&P[i], Pl, Pr, S);
+      intercell_flux(Pl, Pr, 0, &F[i], 0.0, dim);
+    }
+  return 0;
+}
+
+static int drive_sweeps_1d(const double *P, double *L)
+{
+  double *F = (double*) malloc(stride[0]*sizeof(double));
+
+  int i,sx=stride[1];
+  intercell_flux_sweep(P,F,1);
+
+  for (i=sx; i<stride[0]; ++i)
+    {
+      L[i] = -(F[i]-F[i-sx])/dx;
+    }
+
+  free(F);
+
+  return 0;
+}
+static int drive_sweeps_2d(const double *P, double *L)
+{
+  double *F = (double*) malloc(stride[0]*sizeof(double));
+  double *G = (double*) malloc(stride[0]*sizeof(double));
+
+  int i,sx=stride[1],sy=stride[2];
+  intercell_flux_sweep(P,F,1);
+  intercell_flux_sweep(P,G,2);
+
+  for (i=sx; i<stride[0]; ++i)
+    {
+      L[i] = -(F[i]-F[i-sx])/dx - (G[i]-G[i-sy])/dy;
+    }
+
+  constrained_transport_2d(F,G,stride);
+
+  free(F);
+  free(G);
+
+  return 0;
+}
+static int drive_sweeps_3d(const double *P, double *L)
+{
+  double *F = (double*) malloc(stride[0]*sizeof(double));
+  double *G = (double*) malloc(stride[0]*sizeof(double));
+  double *H = (double*) malloc(stride[0]*sizeof(double));
+
+  int i,sx=stride[1],sy=stride[2],sz=stride[3];
+  intercell_flux_sweep(P,F,1);
+  intercell_flux_sweep(P,G,2);
+  intercell_flux_sweep(P,H,3);
+
+  for (i=sx; i<stride[0]; ++i)
+    {
+      L[i] = -(F[i]-F[i-sx])/dx - (G[i]-G[i-sy])/dy - (H[i]-H[i-sz])/dz;
+    }
+
+  constrained_transport_3d(F,G,H,stride);
+
+  free(F);
+  free(G);
+  free(H);
+
+  return 0;
+}
 
 /*------------------------------------------------------------------------------
  *
@@ -140,9 +236,6 @@ int integrate_init(int N[4], double L[4], int num_comp, int num_dims)
   dy = L[2] / (N[2]-2*N[0]);
   dz = L[3] / (N[3]-2*N[0]);
 
-  slope_limiter = plm_minmod;
-  godunov_intercell_flux = hll_flux;
-
   switch (num_dims)
     {
     case 1: drive_sweeps = drive_sweeps_1d; break;
@@ -162,6 +255,19 @@ int integrate_free()
 int get_failure_mask(int *M)
 {
   memcpy(M, failure_mask, stride[0]/NQ*sizeof(int));
+  return 0;
+}
+int set_riemann_solver(int solver)
+{
+  switch (solver)
+    {
+    case 0:
+      intercell_flux = hll_flux;
+      break;
+    case 1:
+      intercell_flux = hllc_flux;
+      break;
+    }
   return 0;
 }
 
@@ -188,7 +294,6 @@ int prim_to_cons_array(double *P, double *U, int N)
     }
   return 0;
 }
-
 
 int advance_state_fwd_euler(double *P, double dt)
 {
@@ -257,109 +362,6 @@ int advance_state_RK3(double *P, double dt)
 
   return failures;
 }
-
-
-/*------------------------------------------------------------------------------
- *
- * Private Functions Definitions
- *
- */
-static int reconstruct_plm(const double *P0, double *Pl, double *Pr, int S)
-{
-  int i,T=2*S;
-
-  for (i=0; i<NQ; ++i)
-    {
-      Pr[i] = P0[S+i] - 0.5 * slope_limiter(P0[ 0+i], P0[S+i], P0[T+i]);
-      Pl[i] = P0[0+i] + 0.5 * slope_limiter(P0[-S+i], P0[0+i], P0[S+i]);
-    }
-
-  return 0;
-}
-static int intercell_flux_sweep(const double *P, double *F, int dim)
-{
-  int i,S=stride[dim];
-  double Pl[MAXNQ], Pr[MAXNQ];
-
-  for (i=S; i<stride[0]-2*S; i+=NQ)
-    {
-      reconstruct_plm(&P[i], Pl, Pr, S);
-      godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0, dim);
-    }
-
-  for (i=0; i<S; ++i)
-    F[i] = F[i+S];
-
-  for (i=stride[0]-2*S; i<stride[0]; ++i)
-    F[i] = F[i-S];
-
-  return 0;
-}
-
-
-static int drive_sweeps_1d(const double *P, double *L)
-{
-  double *F = (double*) malloc(stride[0]*sizeof(double));
-
-  int i,sx=stride[1];
-  intercell_flux_sweep(P,F,1);
-
-  for (i=sx; i<stride[0]; ++i)
-    {
-      L[i] = -(F[i]-F[i-sx])/dx;
-    }
-
-  free(F);
-
-  return 0;
-}
-static int drive_sweeps_2d(const double *P, double *L)
-{
-  double *F = (double*) malloc(stride[0]*sizeof(double));
-  double *G = (double*) malloc(stride[0]*sizeof(double));
-
-  int i,sx=stride[1],sy=stride[2];
-  intercell_flux_sweep(P,F,1);
-  intercell_flux_sweep(P,G,2);
-
-  for (i=sx; i<stride[0]; ++i)
-    {
-      L[i] = -(F[i]-F[i-sx])/dx - (G[i]-G[i-sy])/dy;
-    }
-
-  constrained_transport_2d(F,G,stride);
-
-  free(F);
-  free(G);
-
-  return 0;
-}
-static int drive_sweeps_3d(const double *P, double *L)
-{
-  double *F = (double*) malloc(stride[0]*sizeof(double));
-  double *G = (double*) malloc(stride[0]*sizeof(double));
-  double *H = (double*) malloc(stride[0]*sizeof(double));
-
-  int i,sx=stride[1],sy=stride[2],sz=stride[3];
-  intercell_flux_sweep(P,F,1);
-  intercell_flux_sweep(P,G,2);
-  intercell_flux_sweep(P,H,3);
-
-  for (i=sx; i<stride[0]; ++i)
-    {
-      L[i] = -(F[i]-F[i-sx])/dx - (G[i]-G[i-sy])/dy - (H[i]-H[i-sz])/dz;
-    }
-
-  constrained_transport_3d(F,G,H,stride);
-
-  free(F);
-  free(G);
-  free(H);
-
-  return 0;
-}
-
-
 int advance_state_ctu_hancock(double *P, double dt)
 {
   const int num_dims=ND;
@@ -428,21 +430,21 @@ int advance_state_ctu_hancock(double *P, double dt)
           Pr[j] = P[i+sx+j] - 0.5*dPdx[i+sx+j];
           Pl[j] = P[i   +j] + 0.5*dPdx[i   +j];
         }
-      if(D1) godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0, 1);
+      if(D1) intercell_flux(Pl, Pr, 0, &F[i], 0.0, 1);
 
       for (j=0; j<NQ*D2; ++j)
         {
           Pr[j] = P[i+sy+j] - 0.5*dPdy[i+sy+j];
           Pl[j] = P[i   +j] + 0.5*dPdy[i   +j];
         }
-      if(D2) godunov_intercell_flux(Pl, Pr, 0, &G[i], 0.0, 2);
+      if(D2) intercell_flux(Pl, Pr, 0, &G[i], 0.0, 2);
 
       for (j=0; j<NQ*D3; ++j)
         {
           Pr[j] = P[i+sz+j] - 0.5*dPdz[i+sz+j];
           Pl[j] = P[i   +j] + 0.5*dPdz[i   +j];
         }
-      if(D3) godunov_intercell_flux(Pl, Pr, 0, &H[i], 0.0, 3);
+      if(D3) intercell_flux(Pl, Pr, 0, &H[i], 0.0, 3);
     }
 
   /* Step 3
@@ -568,21 +570,21 @@ int advance_state_ctu_hancock(double *P, double dt)
           Pr[j] = Px[i+sx+j] - 0.5*dPdx[i+sx+j];
           Pl[j] = Px[i   +j] + 0.5*dPdx[i   +j];
         }
-      if(D1) godunov_intercell_flux(Pl, Pr, 0, &F[i], 0.0, 1);
+      if(D1) intercell_flux(Pl, Pr, 0, &F[i], 0.0, 1);
 
       for (j=0; j<NQ*D2; ++j)
         {
           Pr[j] = Py[i+sy+j] - 0.5*dPdy[i+sy+j];
           Pl[j] = Py[i   +j] + 0.5*dPdy[i   +j];
         }
-      if(D2) godunov_intercell_flux(Pl, Pr, 0, &G[i], 0.0, 2);
+      if(D2) intercell_flux(Pl, Pr, 0, &G[i], 0.0, 2);
 
       for (j=0; j<NQ*D3; ++j)
         {
           Pr[j] = Pz[i+sz+j] - 0.5*dPdz[i+sz+j];
           Pl[j] = Pz[i   +j] + 0.5*dPdz[i   +j];
         }
-      if(D3) godunov_intercell_flux(Pl, Pr, 0, &H[i], 0.0, 3);
+      if(D3) intercell_flux(Pl, Pr, 0, &H[i], 0.0, 3);
     }
 
   switch (num_dims)

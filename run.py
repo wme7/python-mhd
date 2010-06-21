@@ -65,13 +65,14 @@ if __name__ == "__main__":
 
     DomainClass = DistributedDomain
 
-    solver = EulersEquationsSolver(scheme='midpoint')
+    solver = RMHDEquationsSolver(scheme='midpoint', solver='hllc')
+
     problem = RMHDCylindricalA()
     domain = DomainClass((32,32), (-0.5,-0.5), (0.5,0.5))
     boundary = OutflowBoundary()
 
     P = run_problem(solver, problem, domain, boundary,
-                    quiet=(domain.rank is not 0), CFL=0.4, tfinal=0.1)
+                    quiet=(domain.rank is not 0), CFL=0.2, tfinal=0.1)
 
     if domain.rank is 0:
         visual.four_pane_2d(P)

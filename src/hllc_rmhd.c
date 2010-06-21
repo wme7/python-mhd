@@ -12,29 +12,48 @@
  *------------------------------------------------------------------------------
  */
 
-#include <stdlib.h>
 #include <memory.h>
-#include <stdio.h>
 #include <math.h>
 
-#define SMALL_BX 1e-12
-#define SMALL_A  1e-10
+/*------------------------------------------------------------------------------
+ *
+ * Public Interface
+ *
+ */
+void reset_max_lambda();
+double get_max_lambda();
+int hllc_flux(const double *pl, const double *pr, double *U, double *F,
+	      double s, int dim);
 
-// Enums used for indexing through primitive/conserved
-// data. The state of a given cell is described by 8
-// contiguous doubles.
+/*------------------------------------------------------------------------------
+ *
+ * External Dependecies
+ *
+ */
+int flux_and_eval(const double *U, const double *P, double *F,
+                  double *ap, double *am, int dim);
 
-enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz }; // Conserved
-enum { rho, pre, vx, vy, vz };             // Primitive
-
-static int dimension = 1;
-
-int rmhd_flux_and_eval(const double *U, const double *P, double *F, double *ap, double *am);
 int prim_to_cons_point(const double *P, double *U);
 int cons_to_prim_point(const double *U, double *P);
 
-int hllc_set_dimension(int d) { dimension = d; return 0; }
-int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s)
+/*------------------------------------------------------------------------------
+ *
+ * Private Data
+ *
+ */
+enum { ddd, tau, Sx, Sy, Sz, Bx, By, Bz }; // Conserved
+enum { rho, pre, vx, vy, vz };             // Primitive
+
+static const double SMALL_BX = 1e-12;
+static const double SMALL_A  = 1e-10;
+
+/*------------------------------------------------------------------------------
+ *
+ * Public Functions Definitions
+ *
+ */
+int hllc_flux(const double *pl, const double *pr, double *U, double *F,
+	      double s, int dim)
 {
   int i;
   double epl, epr, eml, emr;
@@ -46,7 +65,7 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
   int S1=0,S2=0,S3=0;
   int v1=0,v2=0,v3=0;
 
-  switch (dimension)
+  switch (dim)
     {
     case 1:
       B1=Bx; B2=By; B3=Bz;
@@ -75,8 +94,8 @@ int hllc_flux(const double *pl, const double *pr, double *U, double *F, double s
   prim_to_cons_point(Pl,Ul);
   prim_to_cons_point(Pr,Ur);
 
-  rmhd_flux_and_eval(Ul, Pl, Fl, &epl, &eml);
-  rmhd_flux_and_eval(Ur, Pr, Fr, &epr, &emr);
+  flux_and_eval(Ul, Pl, Fl, &epl, &eml, dim);
+  flux_and_eval(Ur, Pr, Fr, &epr, &emr, dim);
 
   Ul[tau] += Ul[ddd];  Fl[tau] += Fl[ddd]; // Change in convention of total energy
   Ur[tau] += Ur[ddd];  Fr[tau] += Fr[ddd];
