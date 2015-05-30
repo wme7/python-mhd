@@ -1,0 +1,27 @@
+'first line of the inpt file' 
+'second'
+'third'
+'', 'basenm', 'SCHN'
+'', 'nend', 100000
+' ', 'tmax', 0.42
+' ', 'suffix', 'EA'
+' ', 'nout', 1000000
+' ', 'tout', 0.1
+' ', 'itstp', 1
+' ', 'cfl', 0.6
+' ', 'dtini', 1.d-5
+' ', 'niter', -1
+' ', 'small', 1.d-10
+' ', 'smlrho', 1.d-10
+' ', 'smallp', 1.d-16
+' ', 'smallu', 1.d-10
+' ', 'gridlx', 1.d0
+' ', 'nx', 200   
+' ', 'igeomx', 0
+' ', 'eta1', 5.d0
+' ', 'eta2', 5.d-2
+' ', 'epsln', 0.1d0
+' ', 'ak0', 1.d0
+' ', 'epsiln', 1.d0
+' ', 'omg1', 0.52
+' ', 'omg2', 10.d0
