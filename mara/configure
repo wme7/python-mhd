@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+
+def ConfigureMaraBuild():
+
+    from os import getcwd, mkdir, system, uname
+    from shutil import copy
+    from os.path import isfile, isdir
+    from conf.templates import ConfigHeader, SystemMakefile
+    from optparse import OptionParser
+
+
+    if not isfile("conf/settings.py"):
+        copy("conf/default_settings.py", "conf/settings.py")
+
+    from conf.settings import SystemConfig
+
+    if uname()[0] == "Linux":
+	SystemConfig["clibs"]="-ldl -lreadline"
+
+    usage = "%prog [options]"
+    description = "*** MARA Astrophysical Relativistic MHD Code ***"
+    parser = OptionParser(usage=usage, description=description)
+
+
+    for k,v in SystemConfig.items():
+        if type(v) == str:
+            parser.add_option("--"+k, default=v, metavar=v, action="store")
+        else:
+            parser.add_option("--"+k, default=v, metavar=v, action="store_true")
+
+    opts1, args = parser.parse_args()
+    opts = opts1.__dict__
+
+    extra = { 'hdf5libs': '-lz -lhdf5',
+              'fftwlibs': '-lfftw',
+              'glfwlibs': '',
+              }
+
+    extra['use_hdf5']     = isfile("%s/include/hdf5.h" % opts["hdf5"])
+    extra['use_hdf5_par'] = isfile("%s/bin/h5pcc" % opts["hdf5"])
+    extra['use_fftw']     = isfile("%s/include/fftw.h" % opts["fftw"])
+    extra['use_glfw']     = not opts["nogl"]
+
+    if not extra['use_hdf5'] : extra['hdf5libs'] = ""
+    if not extra['use_fftw'] : extra['fftwlibs'] = ""
+    if not extra['use_glfw'] : extra['glfwlibs'] = ""
+
+    opts["install_dir"] = getcwd()
+    SystemConfig.update(opts)
+
+
+    print "\nConfiguring Mara with the following options:\n"
+    print "\n".join(sorted(["%-16s = %s" % (a,b) for a,b in SystemConfig.items()]))+"\n"
+
+
+
+    SysMakefile = open("conf/mara.conf", "w")
+    SysMakefile.write(SystemMakefile % dict(SystemConfig.items() + extra.items()))
+
+    CfgHeader = open("src/config.h", "w")
+    CfgHeader.write(ConfigHeader % dict(SystemConfig.items() + extra.items()))
+
+    if not isfile("conf/host.lua"):
+        copy("conf/host.default.lua", "conf/host.lua")
+
+
+
+if __name__ == "__main__":
+    ConfigureMaraBuild()

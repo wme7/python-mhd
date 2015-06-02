@@ -1,0 +1,27 @@
+
+
+
+# Compiled source #
+###################
+src/*.o
+src/config.h
+
+
+
+# Lib install     #
+###################
+bin
+lib
+include
+data
+
+
+
+# Config files    #
+###################
+conf/mara.conf
+conf/host.lua
+conf/configure.last
+conf/settings.py
+conf/*.pyc
+
